@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}POS SUMBA{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_css %}{% endblock %}
+  <style>
+  /* ── SYNC CHIP ──────────────────────────── */
+  #sync-chip {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px 5px 8px;
+    font-size: 12px;
+    font-family: var(--font-main);
+    font-weight: 600;
+    cursor: default;
+    transition: border-color 0.25s, background 0.25s;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    white-space: nowrap;
+  }
+
+  /* State warna border */
+  #sync-chip.online  { border-color: rgba(46,204,113,0.4); }
+  #sync-chip.offline { border-color: rgba(231,76,60,0.4);  background: rgba(231,76,60,0.07);  }
+  #sync-chip.pending { border-color: rgba(243,156,18,0.4); background: rgba(243,156,18,0.07); }
+  #sync-chip.syncing { border-color: rgba(31,105,164,0.5); background: rgba(31,105,164,0.07); }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity:1; transform:scale(1); }
+    50%       { opacity:0.3; transform:scale(0.7); }
+  }
+
+  @keyframes spin-dot {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  #conn-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+
+  #sync-chip.offline #conn-dot { background: var(--danger);  animation: pulse-dot 1.2s infinite; }
+  #sync-chip.pending #conn-dot { background: var(--warning); animation: pulse-dot 1.8s infinite; }
+  #sync-chip.syncing #conn-dot {
+    background: transparent;
+    border: 2px solid var(--accent);
+    border-top-color: transparent;
+    animation: spin-dot 0.8s linear infinite;
+  }
+
+  #conn-label {
+    color: var(--text-muted);
+    transition: color 0.2s;
+  }
+
+  #sync-chip.online  #conn-label { color: var(--success); }
+  #sync-chip.offline #conn-label { color: var(--danger);  }
+  #sync-chip.pending #conn-label { color: var(--warning); }
+  #sync-chip.syncing #conn-label { color: var(--accent);  }
+
+  #sync-status-text {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 11px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #pending-badge {
+    background: var(--warning);
+    color: #111;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    display: none;
+    flex-shrink: 0;
+  }
+
+  #btn-manual-sync:hover { background: var(--accent-hover); }
+
+  /* ── TOAST ─────────────────────────────── */
+  #toast-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 499;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .pos-toast {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 240px;
+    max-width: 340px;
+    pointer-events: all;
+    animation: toast-in 0.3s ease;
+    transition: opacity 0.3s, transform 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  }
+
+  @keyframes toast-in {
+    from { opacity:0; transform:translateX(110%); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+
+  .pos-toast-success { background:rgba(46,204,113,0.15);  border:1px solid rgba(46,204,113,0.35); color:var(--success); }
+  .pos-toast-warning { background:rgba(243,156,18,0.15);  border:1px solid rgba(243,156,18,0.35); color:var(--warning); }
+  .pos-toast-error   { background:rgba(231,76,60,0.15);   border:1px solid rgba(231,76,60,0.35);  color:var(--danger);  }
+  .pos-toast-info    { background:var(--accent-light);     border:1px solid var(--border-focus);   color:var(--accent);  }
+  </style>
+</head>
+<body>
+
+{% if session.user %}
+<div class="app-layout" id="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Toggle button -->
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Sembunyikan sidebar">
+      <svg id="toggle-icon" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <span class="logo-sq outer"></span>
+        <span class="logo-sq inner"></span>
+      </div>
+      <div class="logo-text">
+        <span class="logo-title">POS</span>
+        <span class="logo-sub">SUMBA V.1</span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav">
+      {% if session.user.role in ('admin', 'manajer') %}
+      <a href="{{ url_for('dashboard.index') }}" class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}" title="Dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('kasir.index') }}" class="nav-item {% if request.endpoint == 'kasir.index' %}active{% endif %}" title="Kasir">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span class="nav-label">Kasir</span>
+      </a>
+      <a href="{{ url_for('produk.index') }}" class="nav-item {% if request.endpoint == 'produk.index' or request.endpoint == 'produk.api_produk' %}active{% endif %}" title="Produk">
+        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <span class="nav-label">Produk</span>
+      </a>
+    </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ session.user.name[0].upper() }}</div>
+        <div class="user-details">
+          <span class="user-name">{{ session.user.name }}</span>
+          <span class="user-role">{{ session.user.role }}</span>
+        </div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- SYNC CHIP (pojok kanan atas) -->
+  <div id="sync-chip" class="online">
+    <div id="conn-dot"></div>
+    <span id="conn-label">Online</span>
+    <span id="sync-status-text"></span>
+    <span id="pending-badge"></span>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/db.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sync.js') }}"></script>
+
+<script>
+// ── SIDEBAR TOGGLE ──────────────────────────────────────────
+const SIDEBAR_KEY = 'sidebar_collapsed';
+
+function toggleSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const layout   = document.getElementById('app-layout');
+  const isCollapsed = sidebar.classList.toggle('collapsed');
+  layout.classList.toggle('sidebar-collapsed', isCollapsed);
+  localStorage.setItem(SIDEBAR_KEY, isCollapsed ? '1' : '0');
+}
+
+(function() {
+  const collapsed = localStorage.getItem(SIDEBAR_KEY) === '1';
+  if (collapsed) {
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('app-layout').classList.add('sidebar-collapsed');
+  }
+})();
+
+// ── SERVICE WORKER ──────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(reg => {
+      console.log('[SW] Registered:', reg.scope);
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data && e.data.type === 'TRIGGER_SYNC') {
+          window.PosSync && window.PosSync.syncPendingTransactions();
+        }
+      });
+    }).catch(err => console.warn('[SW] Register failed:', err));
+}
+
+// ── INIT SYNC ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PosSync) window.PosSync.initSync();
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

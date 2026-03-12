@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}Produk — POS SUMBA{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+  <div>
+    <div class="page-title">{% if session.user.role in ('admin','manajer') %}Manajemen Produk{% else %}Daftar Produk{% endif %}</div>
+    <div class="page-sub" id="info-total">Memuat data...</div>
+  </div>
+  {% if session.user.role in ('admin', 'manajer') %}
+  <div style="display:flex;gap:10px;">
+    <button class="btn btn-ghost" onclick="openModal('modal-kategori')">+ Kategori</button>
+    <button class="btn btn-primary" onclick="openModal('modal-produk')">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Tambah Produk
+    </button>
+  </div>
+  {% else %}
+  <div>
+    <span class="badge badge-info" style="padding:6px 12px;font-size:12px;">👁 Mode Lihat Saja</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- FILTER BAR -->
+<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:220px;max-width:380px;">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="search-produk" placeholder="Cari nama produk..." oninput="onSearch(this.value)">
+  </div>
+  <select id="filter-kategori" onchange="onKategori(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:160px;">
+    <option value="">Semua Kategori</option>
+    {% for kat in kategori %}
+    <option value="{{ kat.id }}">{{ kat.name }}</option>
+    {% endfor %}
+  </select>
+  <select id="per-page" onchange="onPerPage(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+    <option value="50">50 / hal</option>
+    <option value="100">100 / hal</option>
+    <option value="200">200 / hal</option>
+  </select>
+</div>
+
+<!-- TABEL PRODUK -->
+<div class="card">
+  <div class="table-wrap">
+    <table id="tabel-produk">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama Produk</th>
+          <th>Kategori</th>
+          <th>Harga Jual</th>
+          <th>Stok</th>
+          <th>Satuan</th>
+          <th>Status</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-produk">
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+          <span id="loading-text">⏳ Memuat data...</span>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PAGINATION -->
+<div id="pagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;">
+  <div id="page-info" style="color:var(--text-muted);font-size:13px;"></div>
+  <div style="display:flex;gap:6px;" id="page-buttons"></div>
+</div>
+
+<!-- MODAL TAMBAH PRODUK -->
+<div class="modal-overlay" id="modal-produk">
+  <div class="modal">
+    <div class="modal-title">Tambah Produk Baru</div>
+    <form method="POST" action="/produk/tambah">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Nama Produk *</label>
+          <input type="text" name="name" required placeholder="Nama produk">
+        </div>
+        <div class="form-group">
+          <label>Harga Jual *</label>
+          <input type="number" name="price" required min="0" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Harga Modal</label>
+          <input type="number" name="cost_price" min="0" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Stok Awal</label>
+          <input type="number" name="stock" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>Stok Minimum</label>
+          <input type="number" name="min_stock" min="0" value="5">
+        </div>
+        <div class="form-group">
+          <label>Satuan</label>
+          <select name="unit">
+            <option value="PCs">PCs</option>
+            <option value="BOX">BOX</option>
+            <option value="PACKs">PACKs</option>
+            <option value="BOTOL">BOTOL</option>
+            <option value="BUNGKUS">BUNGKUS</option>
+            <option value="KARTON">KARTON</option>
+            <option value="KALENG">KALENG</option>
+            <option value="KARDUS">KARDUS</option>
+            <option value="PAPAN">PAPAN</option>
+            <option value="LITER">LITER</option>
+            <option value="LUSIN">LUSIN</option>
+            <option value="BALL">BALL</option>
+            <option value="SLOF">SLOF</option>
+            <option value="GONI">GONI</option>
+            <option value="TABLET">TABLET</option>
+            <option value="STRIP">STRIP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Kategori</label>
+          <select name="category_id">
+            <option value="">— Pilih Kategori —</option>
+            {% for kat in kategori %}
+            <option value="{{ kat.id }}">{{ kat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Barcode (opsional)</label>
+          <input type="text" name="barcode" placeholder="Scan atau ketik barcode">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-produk')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Produk</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL EDIT PRODUK -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-title">Edit Produk</div>
+    <form id="form-edit" method="POST">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Nama Produk *</label>
+          <input type="text" name="name" id="edit-name" required>
+        </div>
+        <div class="form-group">
+          <label>Harga Jual *</label>
+          <input type="number" name="price" id="edit-price" required min="0">
+        </div>
+        <div class="form-group">
+          <label>Stok</label>
+          <input type="number" name="stock" id="edit-stock" min="0">
+        </div>
+        <div class="form-group">
+          <label>Satuan</label>
+          <select name="unit" id="edit-unit">
+            <option value="PCs">PCs</option>
+            <option value="BOX">BOX</option>
+            <option value="PACKs">PACKs</option>
+            <option value="BOTOL">BOTOL</option>
+            <option value="BUNGKUS">BUNGKUS</option>
+            <option value="KARTON">KARTON</option>
+            <option value="KALENG">KALENG</option>
+            <option value="KARDUS">KARDUS</option>
+            <option value="PAPAN">PAPAN</option>
+            <option value="LITER">LITER</option>
+            <option value="LUSIN">LUSIN</option>
+            <option value="BALL">BALL</option>
+            <option value="SLOF">SLOF</option>
+            <option value="CANs">CANs</option>
+            <option value="GONI">GONI</option>
+            <option value="TABLET">TABLET</option>
+            <option value="STRIP">STRIP</option>
+            <option value="SUPPORT">SUPPORT</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-edit')">Batal</button>
+        <button type="submit" class="btn btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH KATEGORI -->
+<div class="modal-overlay" id="modal-kategori">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-title">Tambah Kategori</div>
+    <form method="POST" action="/kategori/tambah">
+      <div class="form-group">
+        <label>Nama Kategori</label>
+        <input type="text" name="name" required placeholder="Makanan, Minuman, dll">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-kategori')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── STATE ─────────────────────────────────────────────
+let state = { page: 1, per_page: 50, search: '', category_id: '', total: 0, total_page: 1 };
+let searchTimer = null;
+const IS_ADMIN = "{{ session.user.role }}" === "admin" || "{{ session.user.role }}" === "manajer";
+
+// ── LOAD DATA ─────────────────────────────────────────
+function loadData() {
+  const tbody = document.getElementById('tbody-produk');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>';
+
+  const params = new URLSearchParams({
+    page:        state.page,
+    per_page:    state.per_page,
+    search:      state.search,
+    category_id: state.category_id,
+  });
+
+  fetch(`/api/produk?${params}`)
+    .then(r => r.json())
+    .then(res => {
+      state.total      = res.total;
+      state.total_page = res.total_page;
+      renderTable(res.data);
+      renderPagination();
+      document.getElementById('info-total').textContent =
+        `${res.total.toLocaleString()} produk aktif`;
+    })
+    .catch(() => {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--danger);">Gagal memuat data.</td></tr>';
+    });
+}
+
+// ── RENDER TABLE ──────────────────────────────────────
+function renderTable(data) {
+  const tbody = document.getElementById('tbody-produk');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">Tidak ada data.</td></tr>';
+    return;
+  }
+
+  const offset = (state.page - 1) * state.per_page;
+  tbody.innerHTML = data.map((p, i) => {
+    const stok    = p.stock;
+    const minStok = p.min_stock || 5;
+    let stokHtml, badgeHtml;
+
+    if (stok === 0) {
+      stokHtml  = `<span style="color:var(--danger);font-weight:700;">0</span>`;
+      badgeHtml = `<span class="badge badge-danger">Habis</span>`;
+    } else if (stok < minStok) {
+      stokHtml  = `<span style="color:var(--warning);font-weight:700;">${stok}</span>`;
+      badgeHtml = `<span class="badge badge-warning">Rendah</span>`;
+    } else {
+      stokHtml  = stok;
+      badgeHtml = `<span class="badge badge-success">Aman</span>`;
+    }
+
+    const katNama = p.categories ? p.categories.name : '—';
+    const nomor   = offset + i + 1;
+
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:12px;">${nomor}</td>
+      <td style="font-weight:600;">${escHtml(p.name)}</td>
+      <td>${escHtml(katNama)}</td>
+      <td style="font-family:var(--font-mono);font-weight:600;">Rp ${fmtNum(p.price)}</td>
+      <td style="font-family:var(--font-mono);">${stokHtml}</td>
+      <td>${escHtml(p.unit)}</td>
+      <td>${badgeHtml}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          ${IS_ADMIN ? `
+          <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(p)})'>Edit</button>
+          <form method="POST" action="/produk/hapus/${p.id}" onsubmit="return confirm('Hapus produk ini?')">
+            <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+          </form>` : `<span style="font-size:11px;color:var(--text-muted);">—</span>`}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── RENDER PAGINATION ─────────────────────────────────
+function renderPagination() {
+  const info    = document.getElementById('page-info');
+  const buttons = document.getElementById('page-buttons');
+  const from    = ((state.page - 1) * state.per_page) + 1;
+  const to      = Math.min(state.page * state.per_page, state.total);
+
+  info.textContent = state.total > 0
+    ? `Menampilkan ${from.toLocaleString()}–${to.toLocaleString()} dari ${state.total.toLocaleString()} produk`
+    : '';
+
+  // Tombol halaman: tampilkan max 7 halaman
+  let pages = [];
+  const tp = state.total_page;
+  const cp = state.page;
+
+  if (tp <= 7) {
+    pages = Array.from({length: tp}, (_, i) => i + 1);
+  } else {
+    pages = [1];
+    if (cp > 3)        pages.push('...');
+    for (let p = Math.max(2, cp-1); p <= Math.min(tp-1, cp+1); p++) pages.push(p);
+    if (cp < tp - 2)   pages.push('...');
+    pages.push(tp);
+  }
+
+  const btnStyle = (active) =>
+    `style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${active ? 'var(--accent)' : 'var(--surface)'};color:${active ? '#fff' : 'var(--text)'};cursor:${active ? 'default' : 'pointer'};font-size:13px;"`;
+
+  buttons.innerHTML = `
+    <button ${btnStyle(false)} onclick="goPage(${cp-1})" ${cp===1?'disabled':''}>‹</button>
+    ${pages.map(p => p === '...'
+      ? `<span style="padding:6px 4px;color:var(--text-muted);">…</span>`
+      : `<button ${btnStyle(p===cp)} onclick="goPage(${p})">${p}</button>`
+    ).join('')}
+    <button ${btnStyle(false)} onclick="goPage(${cp+1})" ${cp===tp?'disabled':''}>›</button>
+  `;
+}
+
+// ── EVENT HANDLERS ────────────────────────────────────
+function goPage(p) {
+  if (p < 1 || p > state.total_page) return;
+  state.page = p;
+  loadData();
+  window.scrollTo(0, 0);
+}
+
+function onSearch(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.search = val.trim();
+    state.page   = 1;
+    loadData();
+  }, 400);
+}
+
+function onKategori(val) {
+  state.category_id = val;
+  state.page        = 1;
+  loadData();
+}
+
+function onPerPage(val) {
+  state.per_page = parseInt(val);
+  state.page     = 1;
+  loadData();
+}
+
+// ── HELPER ────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtNum(n) {
+  return Number(n).toLocaleString('id-ID');
+}
+
+function openEdit(p) {
+  document.getElementById('form-edit').action = `/produk/edit/${p.id}`;
+  document.getElementById('edit-name').value  = p.name;
+  document.getElementById('edit-price').value = p.price;
+  document.getElementById('edit-stock').value = p.stock;
+
+  // Match unit case-insensitive
+  const unitSelect = document.getElementById('edit-unit');
+  const unitVal    = (p.unit || '').toString().trim();
+  let matched = false;
+  for (const opt of unitSelect.options) {
+    if (opt.value.toLowerCase() === unitVal.toLowerCase()) {
+      unitSelect.value = opt.value;
+      matched = true;
+      break;
+    }
+  }
+  // Jika satuan tidak ada di list, tambahkan sebagai opsi sementara
+  if (!matched && unitVal) {
+    const opt = new Option(unitVal, unitVal, true, true);
+    unitSelect.add(opt);
+    unitSelect.value = unitVal;
+  }
+
+  openModal('modal-edit');
+}
+
+// ── INIT ──────────────────────────────────────────────
+loadData();
+</script>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — POS SUMBA{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+  <div>
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub">Ringkasan aktivitas toko hari ini</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);">
+    <span id="refresh-dot" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;"></span>
+    <span id="refresh-label">Realtime</span>
+  </div>
+</div>
+
+<!-- STAT CARDS -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+    <div class="stat-label">Pendapatan Hari Ini</div>
+    <div class="stat-value" id="stat-pendapatan">Rp {{ "{:,.0f}".format(pendapatan_hari_ini) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+    </div>
+    <div class="stat-label">Total Transaksi</div>
+    <div class="stat-value" id="stat-transaksi">{{ total_transaksi }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    </div>
+    <div class="stat-label">Total Produk</div>
+    <div class="stat-value" id="stat-produk">{{ total_produk }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="stat-label">Total Pelanggan</div>
+    <div class="stat-value" id="stat-pelanggan">{{ total_pelanggan }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <!-- TRANSAKSI TERBARU -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;">Transaksi Terbaru</div>
+      <a href="{{ url_for('kasir.index') }}" class="btn btn-primary btn-sm">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Kasir
+      </a>
+    </div>
+    <div class="table-wrap" id="tabel-transaksi">
+      {% if transaksi_terbaru %}
+      <table>
+        <thead><tr><th>Invoice</th><th>Pelanggan</th><th>Bayar</th><th>Total</th></tr></thead>
+        <tbody>
+          {% for tx in transaksi_terbaru %}
+          <tr>
+            <td style="font-family:var(--font-mono);font-size:12px;">{{ tx.invoice_number }}</td>
+            <td>{{ tx.customers.name if tx.customers else '—' }}</td>
+            <td><span class="badge badge-info">{{ tx.payment_method }}</span></td>
+            <td style="font-family:var(--font-mono);font-weight:700;">Rp {{ "{:,.0f}".format(tx.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Belum ada transaksi hari ini</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- STOK RENDAH -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;">⚠️ Stok Rendah</div>
+    <div class="table-wrap" id="tabel-stok">
+      {% if stok_rendah %}
+      <table>
+        <thead><tr><th>Produk</th><th>Stok</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for p in stok_rendah %}
+          <tr>
+            <td>{{ p.name }}</td>
+            <td style="font-family:var(--font-mono);">{{ p.stock }} {{ p.unit }}</td>
+            <td>
+              {% if p.stock == 0 %}
+                <span class="badge badge-danger">Habis</span>
+              {% else %}
+                <span class="badge badge-warning">Rendah</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Semua stok aman ✓</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const REFRESH_INTERVAL = 15000; // polling tiap 15 detik
+
+function fmtRp(n) {
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+function animateValue(el, newText) {
+  // Flash animasi saat nilai berubah
+  if (el && el.textContent !== newText) {
+    el.style.transition = 'opacity 0.2s';
+    el.style.opacity    = '0';
+    setTimeout(() => {
+      el.textContent  = newText;
+      el.style.opacity = '1';
+    }, 200);
+  }
+}
+
+function renderTabelTransaksi(txs) {
+  const wrap = document.getElementById('tabel-transaksi');
+  if (!wrap) return;
+  if (!txs.length) {
+    wrap.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Belum ada transaksi hari ini</p>';
+    return;
+  }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Invoice</th><th>Pelanggan</th><th>Bayar</th><th>Total</th></tr></thead>
+    <tbody>${txs.map(tx => `<tr>
+      <td style="font-family:var(--font-mono);font-size:12px;">${tx.invoice_number}</td>
+      <td>${tx.customer}</td>
+      <td><span class="badge badge-info">${tx.payment_method}</span></td>
+      <td style="font-family:var(--font-mono);font-weight:700;">${fmtRp(tx.total)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function renderTabelStok(stok) {
+  const wrap = document.getElementById('tabel-stok');
+  if (!wrap) return;
+  if (!stok.length) {
+    wrap.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Semua stok aman ✓</p>';
+    return;
+  }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Produk</th><th>Stok</th><th>Status</th></tr></thead>
+    <tbody>${stok.map(p => `<tr>
+      <td>${p.name}</td>
+      <td style="font-family:var(--font-mono);">${p.stock} ${p.unit}</td>
+      <td><span class="badge ${p.stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.stock === 0 ? 'Habis' : 'Rendah'}</span></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function refreshDashboard() {
+  const dot   = document.getElementById('refresh-dot');
+  const label = document.getElementById('refresh-label');
+  try {
+    // Animasi dot saat fetch
+    if (dot) dot.style.background = 'var(--warning)';
+
+    const res  = await fetch('/api/dashboard/stats');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    // Update stat cards dengan animasi
+    animateValue(document.getElementById('stat-pendapatan'), fmtRp(data.pendapatan_hari_ini));
+    animateValue(document.getElementById('stat-transaksi'),  String(data.total_transaksi));
+    animateValue(document.getElementById('stat-produk'),     String(data.total_produk));
+    animateValue(document.getElementById('stat-pelanggan'),  String(data.total_pelanggan));
+
+    // Update tabel
+    renderTabelTransaksi(data.transaksi_terbaru);
+    renderTabelStok(data.stok_rendah);
+
+    // Dot hijau = sukses
+    if (dot) dot.style.background = 'var(--success)';
+    if (label) label.textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+  } catch(e) {
+    if (dot)   dot.style.background   = 'var(--danger)';
+    if (label) label.textContent = 'Gagal refresh';
+    console.warn('[Dashboard] Refresh error:', e);
+  }
+}
+
+// Mulai polling setelah halaman load
+setInterval(refreshDashboard, REFRESH_INTERVAL);
+</script>
+{% endblock %}

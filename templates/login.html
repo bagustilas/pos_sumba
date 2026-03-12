@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Login — POS SUMBA{% endblock %}
+
+{% block auth_content %}
+<style>
+.login-page {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  min-height: 100vh;
+}
+
+.login-left {
+  background: #232323;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-logo-icon {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.login-logo-icon .sq-outer {
+  position: absolute;
+  width: 140px; height: 140px;
+  background: #1f69a4;
+  border-radius: 24px;
+  top: 0; left: 0;
+  animation: float 3s ease-in-out infinite;
+}
+
+.login-logo-icon .sq-inner {
+  position: absolute;
+  width: 86px; height: 86px;
+  background: #232323;
+  border-radius: 14px;
+  top: 27px; left: 27px;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.login-brand-name {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: #fff;
+}
+
+.login-brand-sub {
+  font-size: 12px;
+  color: #565b5e;
+  letter-spacing: 2px;
+}
+
+.login-right {
+  background: #353535;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.login-form-box {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: #8a8f94;
+  margin-bottom: 32px;
+}
+
+.login-input-group {
+  margin-bottom: 16px;
+}
+
+.login-label {
+  display: block;
+  font-size: 12px;
+  color: #8a8f94;
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.login-input-wrap {
+  position: relative;
+}
+
+.login-input {
+  width: 100%;
+  background: #343638;
+  border: 2px solid #454545;
+  border-radius: 10px;
+  color: #fff;
+  padding: 14px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.login-input:focus { border-color: #1f69a4; }
+.login-input::placeholder { color: #565b5e; }
+
+.toggle-pw {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #565b5e;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.login-error {
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  color: #e74c3c;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.login-btn {
+  width: 100%;
+  background: #1f69a4;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 15px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.login-btn:hover { background: #175f96; }
+.login-btn:active { transform: scale(0.98); }
+
+.login-footer {
+  text-align: center;
+  font-size: 11px;
+  color: #565b5e;
+  margin-top: 32px;
+}
+</style>
+
+<div class="login-page">
+  <div class="login-left">
+    <div class="login-logo-icon">
+      <span class="sq-outer"></span>
+      <span class="sq-inner"></span>
+    </div>
+    <div class="login-brand-name">POS</div>
+    <div class="login-brand-sub">SISTEM KASIR SUMBA</div>
+  </div>
+
+  <div class="login-right">
+    <div class="login-form-box">
+      <div class="login-title">Selamat Datang</div>
+      <div class="login-subtitle">Masuk ke sistem POS Sumba</div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="login-error">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('auth.login_post') }}">
+        <div class="login-input-group">
+          <label class="login-label">Email</label>
+          <input class="login-input" type="email" name="email" placeholder="contoh@email.com" required autofocus>
+        </div>
+
+        <div class="login-input-group">
+          <label class="login-label">Password</label>
+          <div class="login-input-wrap">
+            <input class="login-input" type="password" name="password" id="pw-field" placeholder="••••••••" required>
+            <button type="button" class="toggle-pw" onclick="togglePw()">👁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn">MASUK</button>
+      </form>
+
+      <div class="login-footer">POS SUMBA &nbsp;V.1&nbsp; Copy Right @2024</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePw() {
+  const f = document.getElementById('pw-field');
+  f.type = f.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}
