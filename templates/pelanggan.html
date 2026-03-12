@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block title %}Pelanggan — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div>
+    <div class="page-title">Pelanggan & Loyalty</div>
+    <div class="page-sub">Manajemen member & program poin</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Tambah Pelanggan
+  </button>
+</div>
+
+<!-- STATS MINI -->
+<div class="stat-grid" style="margin-bottom:20px;" id="stats-wrap"></div>
+
+<!-- FILTER + TABEL -->
+<div class="card">
+  <div style="display:flex;gap:12px;margin-bottom:16px;">
+    <input type="text" id="search-cust" class="form-control" placeholder="Cari nama pelanggan..." style="flex:1;" oninput="debounce()">
+    <button class="btn btn-ghost" onclick="loadData()">🔍</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Pelanggan</th>
+          <th>Kode Member</th>
+          <th>Telepon</th>
+          <th>Poin Aktif</th>
+          <th>Total Belanja</th>
+          <th>Bergabung</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body">
+        <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+    <span id="tbl-info" style="font-size:12px;color:var(--text-muted);"></span>
+    <div id="page-btns" style="display:flex;gap:6px;"></div>
+  </div>
+</div>
+
+<!-- ── MODAL TAMBAH/EDIT ── -->
+<div class="modal-overlay" id="modal-form">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Tambah Pelanggan</div>
+      <button class="modal-close" onclick="closeModal('modal-form')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div><label class="form-label">Nama Lengkap *</label><input type="text" id="f-name" class="form-control" placeholder="Nama pelanggan..."></div>
+      <div><label class="form-label">Telepon</label><input type="text" id="f-phone" class="form-control" placeholder="08xx..."></div>
+      <div><label class="form-label">Email</label><input type="email" id="f-email" class="form-control" placeholder="email@contoh.com"></div>
+      <div><label class="form-label">Alamat</label><textarea id="f-address" class="form-control" rows="2" placeholder="Alamat..."></textarea></div>
+      <div><label class="form-label">Catatan</label><input type="text" id="f-notes" class="form-control" placeholder="Catatan opsional..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-form')">Batal</button>
+      <button class="btn btn-primary" id="btn-save" onclick="save()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL DETAIL + POIN ── -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-nama">Detail Pelanggan</div>
+      <button class="modal-close" onclick="closeModal('modal-detail')">✕</button>
+    </div>
+
+    <!-- Info pelanggan -->
+    <div id="detail-info" style="background:var(--hover);border-radius:8px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;"></div>
+
+    <!-- Poin card -->
+    <div style="background:linear-gradient(135deg,rgba(31,105,164,0.2),rgba(31,105,164,0.05));border:1px solid rgba(31,105,164,0.3);border-radius:10px;padding:16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">POIN AKTIF</div>
+        <div style="font-size:28px;font-weight:800;font-family:var(--font-mono);" id="detail-poin">0</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Sesuaikan Poin</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="number" id="adj-pts" class="form-control" placeholder="±poin" style="width:90px;padding:6px 8px;">
+          <input type="text" id="adj-note" class="form-control" placeholder="alasan..." style="width:120px;padding:6px 8px;">
+          <button class="btn btn-primary btn-sm" onclick="adjustPoin()">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riwayat poin -->
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Riwayat Poin</div>
+    <div id="riwayat-poin" style="max-height:200px;overflow-y:auto;">
+      <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px;">Memuat riwayat...</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Tutup</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let totalPage   = 1;
+let editId      = null;
+let detailId    = null;
+let debTimer    = null;
+
+function fmt(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+function fmtDt(s) {
+  if (!s) return '-';
+  return new Date(s).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+}
+function debounce() { clearTimeout(debTimer); debTimer = setTimeout(()=>loadData(1),400); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function loadData(page = 1) {
+  currentPage = page;
+  const q = document.getElementById('search-cust').value;
+  const params = new URLSearchParams({page, per_page:20, search:q});
+  const tbody = document.getElementById('tbl-body');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">⏳</td></tr>';
+
+  try {
+    const res  = await fetch('/api/pelanggan?' + params);
+    const data = await res.json();
+    totalPage  = data.total_page;
+    renderTable(data.data, data.total);
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:20px;">⚠️ Gagal memuat</td></tr>';
+  }
+}
+
+function renderTable(rows, total) {
+  const tbody = document.getElementById('tbl-body');
+  document.getElementById('tbl-info').textContent = `${total.toLocaleString('id-ID')} pelanggan`;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada pelanggan</td></tr>';
+    document.getElementById('page-btns').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(c => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${c.name[0].toUpperCase()}</div>
+          <div>
+            <div style="font-weight:600;">${c.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${c.email||''}</div>
+          </div>
+        </div>
+      </td>
+      <td><span style="font-family:var(--font-mono);font-size:12px;background:var(--hover);padding:3px 7px;border-radius:4px;">${c.member_code||'-'}</span></td>
+      <td style="font-size:13px;">${c.phone||'-'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-family:var(--font-mono);font-weight:700;color:var(--accent);">${(c.points||0).toLocaleString('id-ID')}</span>
+          <span style="font-size:10px;color:var(--text-muted);">pts</span>
+        </div>
+      </td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${fmt(c.total_purchase||0)}</td>
+      <td style="font-size:12px;color:var(--text-muted);">${fmtDt(c.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-ghost btn-sm" onclick='openDetail(${JSON.stringify(c)})'>Detail</button>
+          <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(c)})'>Edit</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  // Pagination
+  const btns = document.getElementById('page-btns');
+  if (totalPage <= 1) { btns.innerHTML = ''; return; }
+  let html = `<button class="kat-pill" onclick="loadData(${currentPage-1})" ${currentPage===1?'disabled':''} style="padding:4px 10px;">‹</button>`;
+  for (let i = Math.max(1,currentPage-2); i <= Math.min(totalPage,currentPage+2); i++) {
+    html += `<button class="kat-pill ${i===currentPage?'active':''}" onclick="loadData(${i})" style="padding:4px 10px;">${i}</button>`;
+  }
+  html += `<button class="kat-pill" onclick="loadData(${currentPage+1})" ${currentPage===totalPage?'disabled':''} style="padding:4px 10px;">›</button>`;
+  btns.innerHTML = html;
+}
+
+// ── MODAL TAMBAH/EDIT ────────────────────────────────────
+function openModal() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Tambah Pelanggan Baru';
+  ['name','phone','email','address','notes'].forEach(f => document.getElementById('f-'+f).value = '');
+  document.getElementById('modal-form').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+function openEdit(c) {
+  editId = c.id;
+  document.getElementById('modal-title').textContent = 'Edit Pelanggan';
+  document.getElementById('f-name').value    = c.name||'';
+  document.getElementById('f-phone').value   = c.phone||'';
+  document.getElementById('f-email').value   = c.email||'';
+  document.getElementById('f-address').value = c.address||'';
+  document.getElementById('f-notes').value   = c.notes||'';
+  document.getElementById('modal-form').classList.add('open');
+}
+async function save() {
+  const btn  = document.getElementById('btn-save');
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('Nama wajib diisi'); return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  const body = {
+    name, phone: document.getElementById('f-phone').value,
+    email: document.getElementById('f-email').value,
+    address: document.getElementById('f-address').value,
+    notes: document.getElementById('f-notes').value,
+  };
+
+  try {
+    const url    = editId ? `/api/pelanggan/${editId}` : '/api/pelanggan';
+    const method = editId ? 'PATCH' : 'POST';
+    const res    = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data   = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeModal('modal-form');
+    loadData(currentPage);
+    window.PosSync?.showToast(editId ? 'Data diperbarui' : 'Pelanggan ditambahkan ✅', 'success');
+  } catch(e) {
+    alert('Gagal: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Simpan';
+  }
+}
+
+// ── DETAIL & POIN ─────────────────────────────────────────
+function openDetail(c) {
+  detailId = c.id;
+  document.getElementById('detail-nama').textContent = c.name;
+  document.getElementById('detail-poin').textContent = (c.points||0).toLocaleString('id-ID');
+  document.getElementById('detail-info').innerHTML = `
+    <div><span style="color:var(--text-muted);">Kode Member</span><br><strong>${c.member_code||'-'}</strong></div>
+    <div><span style="color:var(--text-muted);">Telepon</span><br><strong>${c.phone||'-'}</strong></div>
+    <div><span style="color:var(--text-muted);">Email</span><br><strong>${c.email||'-'}</strong></div>
+    <div><span style="color:var(--text-muted);">Total Poin Didapat</span><br><strong>${(c.points_total||0).toLocaleString('id-ID')} pts</strong></div>
+    <div><span style="color:var(--text-muted);">Total Pembelian</span><br><strong>${fmt(c.total_purchase||0)}</strong></div>
+    <div><span style="color:var(--text-muted);">Bergabung</span><br><strong>${fmtDt(c.created_at)}</strong></div>
+  `;
+  document.getElementById('adj-pts').value  = '';
+  document.getElementById('adj-note').value = '';
+  document.getElementById('modal-detail').classList.add('open');
+  loadRiwayatPoin(c.id);
+}
+
+async function loadRiwayatPoin(custId) {
+  const el = document.getElementById('riwayat-poin');
+  try {
+    const res  = await fetch(`/api/pelanggan/${custId}/poin`);
+    const data = await res.json();
+    if (!data.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px;">Belum ada riwayat poin</div>';
+      return;
+    }
+    el.innerHTML = data.map(p => {
+      const isEarn  = p.type === 'earn' || p.points > 0;
+      const color   = isEarn ? 'var(--success)' : 'var(--danger)';
+      const sign    = p.points > 0 ? '+' : '';
+      const tgl     = new Date(p.created_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);font-size:12px;">
+        <div>
+          <span class="badge ${isEarn ? 'badge-success' : 'badge-danger'}" style="font-size:10px;">${p.type.toUpperCase()}</span>
+          <span style="margin-left:6px;color:var(--text-muted);">${p.note||''}</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span style="font-family:var(--font-mono);font-weight:700;color:${color};">${sign}${p.points}</span>
+          <span style="color:var(--text-muted);">→ ${p.balance_after}</span>
+          <span style="color:var(--text-muted);">${tgl}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--danger);font-size:12px;padding:8px;">Gagal memuat riwayat</div>';
+  }
+}
+
+async function adjustPoin() {
+  const pts  = parseInt(document.getElementById('adj-pts').value);
+  const note = document.getElementById('adj-note').value || 'Penyesuaian manual';
+  if (!pts || isNaN(pts)) { alert('Masukkan jumlah poin (positif atau negatif)'); return; }
+  try {
+    const res  = await fetch(`/api/pelanggan/${detailId}/poin/adjust`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({points: pts, note})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    document.getElementById('detail-poin').textContent = data.new_points.toLocaleString('id-ID');
+    document.getElementById('adj-pts').value  = '';
+    document.getElementById('adj-note').value = '';
+    loadRiwayatPoin(detailId);
+    loadData(currentPage);
+    window.PosSync?.showToast('Poin disesuaikan ✅', 'success');
+  } catch(e) { alert('Gagal: ' + e.message); }
+}
+
+// ── INIT ─────────────────────────────────────────────────
+loadData();
+</script>
+{% endblock %}

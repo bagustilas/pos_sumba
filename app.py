@@ -12,6 +12,13 @@ from routes.sync import sync_bp
 from routes.laporan import laporan_bp
 from routes.pengguna import pengguna_bp
 from routes.pengaturan import pengaturan_bp
+from routes.stok import stok_bp
+from routes.shift import shift_bp
+from routes.grafik import grafik_bp
+from routes.pelanggan import pelanggan_bp
+from routes.voucher import voucher_bp
+from routes.retur import retur_bp
+from routes.backup import backup_bp
 import os
 from dotenv import load_dotenv
 
@@ -28,6 +35,13 @@ app.register_blueprint(sync_bp)
 app.register_blueprint(laporan_bp)
 app.register_blueprint(pengguna_bp)
 app.register_blueprint(pengaturan_bp)
+app.register_blueprint(stok_bp)
+app.register_blueprint(shift_bp)
+app.register_blueprint(grafik_bp)
+app.register_blueprint(pelanggan_bp)
+app.register_blueprint(voucher_bp)
+app.register_blueprint(retur_bp)
+app.register_blueprint(backup_bp)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

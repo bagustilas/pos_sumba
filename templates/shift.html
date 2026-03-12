@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Shift Kasir — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+  <div class="page-title">Shift Kasir</div>
+  <div class="page-sub">Buka & tutup shift, lihat riwayat per shift</div>
+</div>
+
+<!-- STATUS SHIFT AKTIF -->
+<div id="panel-shift-aktif" style="margin-bottom:20px;"></div>
+
+<!-- RIWAYAT SHIFT -->
+<div class="card">
+  <div style="font-weight:700;font-size:14px;margin-bottom:16px;">Riwayat Shift (30 terakhir)</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Kasir</th>
+          <th>Buka</th>
+          <th>Tutup</th>
+          <th>Modal Awal</th>
+          <th>Total Penjualan</th>
+          <th>Jml Transaksi</th>
+          <th>Status</th>
+          <th>Selisih Kas</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-shift">
+        <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL BUKA SHIFT -->
+<div class="modal-overlay" id="modal-buka">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title">Buka Shift Baru</div>
+      <button class="modal-close" onclick="closeModal('modal-buka')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="form-label">Modal Awal Kas (Rp)</label>
+        <input type="number" id="buka-modal" class="form-control" value="0" min="0" placeholder="Jumlah uang kas awal...">
+      </div>
+      <div style="background:var(--hover);border-radius:8px;padding:12px;font-size:13px;color:var(--text-muted);">
+        ⚠️ Pastikan uang kas sudah dihitung sebelum membuka shift.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-buka')">Batal</button>
+      <button class="btn btn-primary" onclick="bukaShift()">Buka Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TUTUP SHIFT -->
+<div class="modal-overlay" id="modal-tutup">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title">Tutup Shift</div>
+      <button class="modal-close" onclick="closeModal('modal-tutup')">✕</button>
+    </div>
+    <div id="tutup-summary" style="margin-bottom:16px;"></div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="form-label">Uang Kas Akhir (Rp)</label>
+        <input type="number" id="tutup-kas" class="form-control" value="0" min="0" oninput="calcSelisih()">
+      </div>
+      <div id="selisih-info" style="border-radius:8px;padding:12px;font-size:13px;font-weight:600;"></div>
+      <div>
+        <label class="form-label">Catatan (opsional)</label>
+        <textarea id="tutup-note" class="form-control" rows="2" placeholder="Catatan penutupan shift..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-tutup')">Batal</button>
+      <button class="btn" style="background:var(--danger);color:#fff;" onclick="tutupShift()">Tutup Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HASIL TUTUP -->
+<div class="modal-overlay" id="modal-hasil">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title">✅ Shift Ditutup</div>
+    </div>
+    <div id="hasil-body" style="font-size:13px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('modal-hasil');loadShift()">OK</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activeShift = null;
+let shiftTotalSales = 0;
+
+function fmt(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+function fmtDt(s) {
+  if (!s) return '-';
+  return new Date(s).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── LOAD STATUS SHIFT ──────────────────────────────────────
+async function loadShiftStatus() {
+  try {
+    const res  = await fetch('/api/shift/status');
+    const data = await res.json();
+    activeShift = data.shift;
+    renderShiftPanel();
+  } catch(e) { console.warn('shift status error', e); }
+}
+
+function renderShiftPanel() {
+  const el = document.getElementById('panel-shift-aktif');
+  if (activeShift) {
+    const durasi = Math.round((Date.now() - new Date(activeShift.opened_at)) / 60000);
+    el.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg,rgba(31,105,164,0.15),rgba(31,105,164,0.05));border:1px solid rgba(31,105,164,0.3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">SHIFT SEDANG BERJALAN</div>
+            <div style="font-weight:700;font-size:16px;">Dibuka: ${fmtDt(activeShift.opened_at)}</div>
+            <div style="color:var(--text-muted);font-size:13px;margin-top:2px;">Modal Awal: ${fmt(activeShift.opening_cash)} &nbsp;|&nbsp; Berjalan: ${durasi} menit</div>
+          </div>
+          <button class="btn" style="background:var(--danger);color:#fff;flex-shrink:0;" onclick="openTutupShift()">Tutup Shift</button>
+        </div>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="card" style="text-align:center;padding:24px;background:rgba(255,255,255,0.02);border-style:dashed;">
+        <div style="color:var(--text-muted);font-size:13px;margin-bottom:12px;">Tidak ada shift aktif</div>
+        <button class="btn btn-primary" onclick="openBukaShift()">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Buka Shift Sekarang
+        </button>
+      </div>`;
+  }
+}
+
+// ── RIWAYAT SHIFT ─────────────────────────────────────────
+async function loadShift() {
+  try {
+    const res  = await fetch('/api/shift/riwayat');
+    const data = await res.json();
+    const tbody = document.getElementById('tbl-shift');
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada riwayat shift</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(s => {
+      const selisih = s.status === 'closed' ? s.closing_cash - (s.opening_cash + s.total_sales) : null;
+      const selColor = selisih === null ? '' : selisih >= 0 ? 'var(--success)' : 'var(--danger)';
+      return `<tr>
+        <td><strong>${s.kasir}</strong></td>
+        <td style="font-size:12px;">${fmtDt(s.opened_at)}</td>
+        <td style="font-size:12px;">${s.status==='closed' ? fmtDt(s.closed_at) : '<span style="color:var(--accent)">Masih buka</span>'}</td>
+        <td style="font-family:var(--font-mono);">${fmt(s.opening_cash)}</td>
+        <td style="font-family:var(--font-mono);font-weight:700;">${fmt(s.total_sales)}</td>
+        <td style="text-align:center;">${s.total_tx}</td>
+        <td><span class="badge ${s.status==='open'?'badge-success':'badge-info'}">${s.status==='open'?'BUKA':'TUTUP'}</span></td>
+        <td style="font-family:var(--font-mono);font-weight:700;color:${selColor};">
+          ${selisih !== null ? (selisih>=0?'+':'')+fmt(selisih) : '-'}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.warn('loadShift error', e); }
+}
+
+// ── BUKA SHIFT ─────────────────────────────────────────────
+function openBukaShift() {
+  document.getElementById('buka-modal').value = 0;
+  document.getElementById('modal-buka').classList.add('open');
+  setTimeout(() => document.getElementById('buka-modal').focus(), 100);
+}
+
+async function bukaShift() {
+  const modal = parseFloat(document.getElementById('buka-modal').value) || 0;
+  try {
+    const res  = await fetch('/api/shift/buka', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ opening_cash: modal })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeModal('modal-buka');
+    await loadShiftStatus();
+    await loadShift();
+    window.PosSync?.showToast('✅ Shift dibuka', 'success');
+  } catch(e) { alert('Gagal buka shift: ' + e.message); }
+}
+
+// ── TUTUP SHIFT ────────────────────────────────────────────
+async function openTutupShift() {
+  if (!activeShift) return;
+
+  // Ambil total penjualan shift ini dari server
+  const res   = await fetch(`/api/shift/riwayat`);
+  const shifts = await res.json();
+  const sh    = shifts.find(s => s.id === activeShift.id);
+  shiftTotalSales = sh ? sh.total_sales : 0;
+
+  document.getElementById('tutup-summary').innerHTML = `
+    <div style="background:var(--hover);border-radius:8px;padding:14px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--text-muted);">Modal Awal</span><strong>${fmt(activeShift.opening_cash)}</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--text-muted);">Total Penjualan</span><strong style="color:var(--success);">${fmt(shiftTotalSales)}</strong></div>
+      <div style="border-top:1px solid var(--border);padding-top:6px;display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Kas Seharusnya</span><strong style="color:var(--accent);">${fmt(parseFloat(activeShift.opening_cash) + shiftTotalSales)}</strong></div>
+    </div>`;
+  document.getElementById('tutup-kas').value = Math.round(parseFloat(activeShift.opening_cash) + shiftTotalSales);
+  calcSelisih();
+  document.getElementById('modal-tutup').classList.add('open');
+}
+
+function calcSelisih() {
+  const kas      = parseFloat(document.getElementById('tutup-kas').value) || 0;
+  const seharusnya = parseFloat(activeShift?.opening_cash || 0) + shiftTotalSales;
+  const selisih  = kas - seharusnya;
+  const el       = document.getElementById('selisih-info');
+  if (selisih === 0) {
+    el.style.background = 'rgba(39,174,96,0.1)'; el.style.color = 'var(--success)';
+    el.textContent = '✅ Kas sesuai, tidak ada selisih';
+  } else if (selisih > 0) {
+    el.style.background = 'rgba(243,156,18,0.1)'; el.style.color = '#f39c12';
+    el.textContent = `⚠️ Kas lebih: ${fmt(selisih)}`;
+  } else {
+    el.style.background = 'rgba(231,76,60,0.1)'; el.style.color = 'var(--danger)';
+    el.textContent = `⚠️ Kas kurang: ${fmt(Math.abs(selisih))}`;
+  }
+}
+
+async function tutupShift() {
+  if (!activeShift) return;
+  const kas  = parseFloat(document.getElementById('tutup-kas').value) || 0;
+  const note = document.getElementById('tutup-note').value;
+  try {
+    const res  = await fetch('/api/shift/tutup', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ shift_id: activeShift.id, closing_cash: kas, note })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    closeModal('modal-tutup');
+    activeShift = null;
+    renderShiftPanel();
+
+    const selisih = kas - (parseFloat(activeShift?.opening_cash||0) + data.total_sales);
+    document.getElementById('hasil-body').innerHTML = `
+      <div style="text-align:center;padding:16px 8px;">
+        <div style="font-size:40px;margin-bottom:12px;">✅</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:16px;">${fmt(data.total_sales)}</div>
+        <div style="font-size:13px;color:var(--text-muted);">Total penjualan dari ${data.total_tx} transaksi</div>
+      </div>`;
+    document.getElementById('modal-hasil').classList.add('open');
+    await loadShift();
+  } catch(e) { alert('Gagal tutup shift: ' + e.message); }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+loadShiftStatus();
+loadShift();
+</script>
+{% endblock %}

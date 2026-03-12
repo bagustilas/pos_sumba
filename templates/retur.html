@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Retur — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div>
+    <div class="page-title">Retur Transaksi</div>
+    <div class="page-sub">Kembalian barang & refund</div>
+  </div>
+  <button class="btn btn-primary" onclick="openRetur()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+    Proses Retur
+  </button>
+</div>
+
+<div class="card">
+  <div style="font-weight:700;font-size:14px;margin-bottom:16px;">Riwayat Retur</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice Asal</th>
+          <th>Tanggal</th>
+          <th>Kasir</th>
+          <th>Total Refund</th>
+          <th>Alasan</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-retur">
+        <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+    <span id="retur-info" style="font-size:12px;color:var(--text-muted);"></span>
+    <div id="retur-pages" style="display:flex;gap:6px;"></div>
+  </div>
+</div>
+
+<!-- MODAL PROSES RETUR -->
+<div class="modal-overlay" id="modal-retur">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title">Proses Retur</div>
+      <button class="modal-close" onclick="closeRetur()">✕</button>
+    </div>
+
+    <!-- Step 1: Cari Invoice -->
+    <div id="step-1">
+      <div style="margin-bottom:12px;">
+        <label class="form-label">Nomor Invoice</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="r-invoice" class="form-control" placeholder="INV-20260312-00001..." style="flex:1;" onkeydown="if(event.key==='Enter')cekInvoice()">
+          <button class="btn btn-primary" onclick="cekInvoice()">Cek</button>
+        </div>
+        <div id="invoice-error" style="color:var(--danger);font-size:12px;margin-top:6px;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: Pilih Item -->
+    <div id="step-2" style="display:none;">
+      <div id="tx-info" style="background:var(--hover);border-radius:8px;padding:12px;font-size:13px;margin-bottom:12px;"></div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Pilih item yang diretur:</div>
+      <div id="r-items" style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:12px;"></div>
+      <div>
+        <label class="form-label">Alasan Retur</label>
+        <textarea id="r-reason" class="form-control" rows="2" placeholder="Alasan retur barang..."></textarea>
+      </div>
+      <div id="r-total-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px;background:rgba(231,76,60,0.1);border-radius:8px;">
+        <span style="font-weight:700;">Total Refund:</span>
+        <span id="r-total" style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--danger);">Rp 0</span>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeRetur()">Batal</button>
+      <button id="btn-retur" class="btn" style="background:var(--danger);color:#fff;display:none;" onclick="simpanRetur()">Proses Retur</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let txData    = null;
+let returItems = [];
+let retuPage  = 1;
+
+function fmt(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+function fmtDt(s) {
+  if (!s) return '-';
+  return new Date(s).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadRetur(page = 1) {
+  retuPage = page;
+  const tbody = document.getElementById('tbl-retur');
+  try {
+    const res  = await fetch(`/api/retur?page=${page}`);
+    const data = await res.json();
+    if (!data.data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada retur</td></tr>';
+      document.getElementById('retur-pages').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = data.data.map(r => `<tr>
+      <td style="font-family:var(--font-mono);font-size:12px;font-weight:700;">${r.invoice}</td>
+      <td style="font-size:12px;">${fmtDt(r.created_at)}</td>
+      <td>${r.kasir}</td>
+      <td style="font-family:var(--font-mono);color:var(--danger);font-weight:700;">${fmt(r.total_refund)}</td>
+      <td style="font-size:12px;color:var(--text-muted);">${r.reason||'-'}</td>
+      <td><span class="badge badge-success">${r.status}</span></td>
+    </tr>`).join('');
+
+    const total = data.total;
+    const from  = (page-1)*20+1, to = Math.min(page*20, total);
+    document.getElementById('retur-info').textContent = `${from}–${to} dari ${total}`;
+
+    const tp = data.total_page;
+    const pg = document.getElementById('retur-pages');
+    if (tp <= 1) { pg.innerHTML = ''; return; }
+    let html = `<button class="kat-pill" onclick="loadRetur(${page-1})" ${page===1?'disabled':''} style="padding:4px 10px;">‹</button>`;
+    for (let i = Math.max(1,page-2); i <= Math.min(tp,page+2); i++) {
+      html += `<button class="kat-pill ${i===page?'active':''}" onclick="loadRetur(${i})" style="padding:4px 10px;">${i}</button>`;
+    }
+    html += `<button class="kat-pill" onclick="loadRetur(${page+1})" ${page===tp?'disabled':''} style="padding:4px 10px;">›</button>`;
+    pg.innerHTML = html;
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">⚠️ Gagal memuat</td></tr>';
+  }
+}
+
+function openRetur() {
+  txData = null; returItems = [];
+  document.getElementById('r-invoice').value = '';
+  document.getElementById('invoice-error').style.display = 'none';
+  document.getElementById('step-1').style.display = '';
+  document.getElementById('step-2').style.display = 'none';
+  document.getElementById('btn-retur').style.display = 'none';
+  document.getElementById('modal-retur').classList.add('open');
+  setTimeout(() => document.getElementById('r-invoice').focus(), 100);
+}
+function closeRetur() { document.getElementById('modal-retur').classList.remove('open'); }
+
+async function cekInvoice() {
+  const invoice = document.getElementById('r-invoice').value.trim().toUpperCase();
+  const errEl   = document.getElementById('invoice-error');
+  if (!invoice) { errEl.textContent = 'Masukkan nomor invoice'; errEl.style.display = ''; return; }
+
+  try {
+    const res  = await fetch(`/api/retur/cek/${encodeURIComponent(invoice)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    txData = data;
+    errEl.style.display = 'none';
+    showStep2(data);
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+  }
+}
+
+function showStep2(data) {
+  document.getElementById('step-2').style.display = '';
+  const tx    = data.transaction;
+  const items = data.items;
+
+  document.getElementById('tx-info').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div><span style="color:var(--text-muted);font-size:11px;">INVOICE</span><br><strong>${tx.invoice_number}</strong></div>
+      <div><span style="color:var(--text-muted);font-size:11px;">TANGGAL</span><br><strong>${fmtDt(tx.created_at)}</strong></div>
+      <div><span style="color:var(--text-muted);font-size:11px;">TOTAL</span><br><strong style="color:var(--accent);">${fmt(tx.total)}</strong></div>
+    </div>`;
+
+  returItems = items.map(i => ({ ...i, retur_qty: 0 }));
+
+  document.getElementById('r-items').innerHTML = items.map((item, idx) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--hover);border-radius:8px;gap:12px;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;">${item.product_name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${fmt(item.price)} × ${item.quantity} = ${fmt(item.subtotal)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--text-muted);">Qty Retur:</span>
+        <input type="number" min="0" max="${item.quantity}" value="0" class="form-control"
+               style="width:70px;padding:4px 8px;"
+               oninput="setReturQty(${idx}, this.value, ${item.quantity}, ${item.price})">
+        <span style="font-size:12px;color:var(--text-muted);">/ ${item.quantity}</span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('btn-retur').style.display = '';
+  calcReturTotal();
+}
+
+function setReturQty(idx, val, maxQty, price) {
+  const qty = Math.min(Math.max(0, parseInt(val) || 0), maxQty);
+  returItems[idx].retur_qty = qty;
+  calcReturTotal();
+}
+
+function calcReturTotal() {
+  const total = returItems.reduce((s, i) => s + (i.retur_qty * parseFloat(i.price)), 0);
+  document.getElementById('r-total').textContent = fmt(total);
+}
+
+async function simpanRetur() {
+  const items = returItems.filter(i => i.retur_qty > 0).map(i => ({
+    product_id:   i.product_id,
+    product_name: i.product_name,
+    price:        i.price,
+    qty:          i.retur_qty,
+  }));
+  if (!items.length) { alert('Pilih minimal 1 item untuk diretur'); return; }
+
+  const reason = document.getElementById('r-reason').value.trim();
+  const btn    = document.getElementById('btn-retur');
+  btn.disabled = true; btn.textContent = 'Memproses...';
+
+  try {
+    const res = await fetch('/api/retur', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        transaction_id: txData.transaction.id,
+        items, reason,
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeRetur();
+    loadRetur();
+    window.PosSync?.showToast(`✅ Retur berhasil — Refund ${fmt(data.total_refund)}`, 'success');
+  } catch(e) {
+    alert('Gagal retur: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Proses Retur';
+  }
+}
+
+loadRetur();
+</script>
+{% endblock %}

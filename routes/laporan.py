@@ -109,3 +109,45 @@ def api_rekap():
         "dari":             tgl_dari,
         "sampai":           tgl_sampai,
     })
+
+@laporan_bp.route("/api/laporan/export/csv")
+@admin_required
+def export_csv():
+    """Export laporan ke CSV langsung dari server"""
+    from flask import Response
+    import csv, io
+
+    sb       = get_supabase()
+    tgl_dari = request.args.get("dari", date.today().replace(day=1).isoformat())
+    tgl_sampai = request.args.get("sampai", date.today().isoformat())
+
+    try:
+        sampai_dt = datetime.strptime(tgl_sampai, "%Y-%m-%d") + timedelta(days=1)
+        sampai_str = sampai_dt.strftime("%Y-%m-%d")
+    except:
+        sampai_str = tgl_sampai
+
+    txs = sb.table("transactions").select(
+        "invoice_number,total,payment_method,status,note,created_at,users(name)"
+    ).eq("status","completed").gte("created_at", tgl_dari).lte("created_at", sampai_str) \
+     .order("created_at", desc=True).execute().data or []
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Invoice","Tanggal","Kasir","Metode","Total","Catatan"])
+    for tx in txs:
+        writer.writerow([
+            tx.get("invoice_number",""),
+            tx.get("created_at",""),
+            tx["users"]["name"] if tx.get("users") else "",
+            tx.get("payment_method",""),
+            tx.get("total",""),
+            tx.get("note",""),
+        ])
+
+    filename = f"laporan-{tgl_dari}-{tgl_sampai}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

@@ -1,0 +1,458 @@
+{% extends "base.html" %}
+{% block title %}Manajemen Stok — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div>
+    <div class="page-title">Manajemen Stok</div>
+    <div class="page-sub">Stok masuk, riwayat & peringatan stok rendah</div>
+  </div>
+  <button class="btn btn-primary" onclick="openStokMasuk()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Stok Masuk
+  </button>
+</div>
+
+<!-- TAB -->
+<div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+  <button class="tab-btn active" id="tab-rendah" onclick="switchTab('rendah')">
+    🔴 Stok Rendah <span id="badge-rendah" class="badge badge-danger" style="display:none;">0</span>
+  </button>
+  <button class="tab-btn" id="tab-riwayat" onclick="switchTab('riwayat')">📋 Riwayat</button>
+  <button class="tab-btn" id="tab-supplier" onclick="switchTab('supplier')">🚚 Supplier</button>
+</div>
+
+<!-- PANEL STOK RENDAH -->
+<div id="panel-rendah">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;">Produk Stok Rendah</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:12px;color:var(--text-muted);">Batas:</label>
+        <input type="number" id="batas-stok" value="10" min="0" class="form-control" style="width:70px;padding:4px 8px;" oninput="loadStokRendah()">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Produk</th><th>Kategori</th><th>Stok</th><th>Min Stok</th><th>Satuan</th><th>Aksi</th></tr>
+        </thead>
+        <tbody id="tbl-rendah">
+          <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL RIWAYAT -->
+<div id="panel-riwayat" style="display:none;">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;">Riwayat Perubahan Stok</div>
+      <input type="text" id="search-riwayat" class="form-control" placeholder="Cari catatan..." style="width:200px;" oninput="debounceRiwayat()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Tanggal</th><th>Produk</th><th>Tipe</th><th>Sebelum</th><th>Perubahan</th><th>Sesudah</th><th>Catatan</th><th>User</th></tr>
+        </thead>
+        <tbody id="tbl-riwayat">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+      <span id="riwayat-info" style="font-size:12px;color:var(--text-muted);"></span>
+      <div id="riwayat-pages" style="display:flex;gap:6px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL SUPPLIER -->
+<div id="panel-supplier" style="display:none;">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;">Daftar Supplier</div>
+      <button class="btn btn-primary btn-sm" onclick="openAddSupplier()">+ Tambah Supplier</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nama</th><th>Telepon</th><th>Email</th><th>Alamat</th></tr></thead>
+        <tbody id="tbl-supplier">
+          <tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Memuat...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL STOK MASUK ──────────────────────────────────── -->
+<div class="modal-overlay" id="modal-stok">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title">Input Stok Masuk</div>
+      <button class="modal-close" onclick="closeStokMasuk()">✕</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label class="form-label">Supplier</label>
+        <select id="sm-supplier" class="form-control">
+          <option value="">-- Pilih Supplier --</option>
+          {% for s in suppliers %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Catatan</label>
+        <input type="text" id="sm-note" class="form-control" placeholder="Keterangan stok masuk...">
+      </div>
+    </div>
+
+    <!-- Cari produk -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input type="text" id="sm-search" class="form-control" placeholder="Cari produk untuk ditambah..." style="flex:1;" oninput="debounceSearchProduk()">
+    </div>
+    <div id="sm-produk-hasil" style="display:none;border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;background:var(--card-bg);"></div>
+
+    <!-- Tabel item -->
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Item Stok Masuk:</div>
+    <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+      <table>
+        <thead><tr><th>Produk</th><th>Qty</th><th>Harga Beli</th><th>Subtotal</th><th></th></tr></thead>
+        <tbody id="sm-items"></tbody>
+        <tfoot>
+          <tr id="sm-total-row" style="display:none;">
+            <td colspan="3" style="font-weight:700;text-align:right;padding:10px 8px;">TOTAL</td>
+            <td style="font-weight:700;font-family:var(--font-mono);color:var(--accent);padding:10px 8px;" id="sm-total">Rp 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="sm-empty" style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;">Belum ada item — cari produk di atas</div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeStokMasuk()">Batal</button>
+      <button class="btn btn-primary" id="btn-simpan-stok" onclick="simpanStokMasuk()">Simpan Stok Masuk</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SUPPLIER -->
+<div class="modal-overlay" id="modal-supplier">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">Tambah Supplier</div>
+      <button class="modal-close" onclick="closeAddSupplier()">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div><label class="form-label">Nama Supplier *</label><input type="text" id="sp-name" class="form-control" placeholder="Nama supplier..."></div>
+      <div><label class="form-label">Telepon</label><input type="text" id="sp-phone" class="form-control" placeholder="08xx..."></div>
+      <div><label class="form-label">Email</label><input type="email" id="sp-email" class="form-control" placeholder="supplier@email.com"></div>
+      <div><label class="form-label">Alamat</label><textarea id="sp-address" class="form-control" rows="2" placeholder="Alamat supplier..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddSupplier()">Batal</button>
+      <button class="btn btn-primary" onclick="simpanSupplier()">Simpan</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let smItems = [];
+let riwayatPage = 1;
+let riwayatTotal = 0;
+let debTimer = null;
+let debTimer2 = null;
+
+// ── TAB ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['rendah','riwayat','supplier'].forEach(t => {
+    document.getElementById('panel-' + t).style.display = t === tab ? '' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'riwayat') loadRiwayat(1);
+  if (tab === 'supplier') loadSupplier();
+}
+
+// ── STOK RENDAH ─────────────────────────────────────────────
+async function loadStokRendah() {
+  const batas = document.getElementById('batas-stok').value || 10;
+  const tbody = document.getElementById('tbl-rendah');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">⏳ Memuat...</td></tr>';
+
+  try {
+    const res  = await fetch(`/api/stok/rendah?batas=${batas}`);
+    const data = await res.json();
+
+    const badge = document.getElementById('badge-rendah');
+    badge.textContent = data.length;
+    badge.style.display = data.length ? '' : 'none';
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--success);">✅ Semua stok aman</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(p => {
+      const pct   = p.min_stock > 0 ? Math.min(100, (p.stock / p.min_stock) * 100) : 100;
+      const color = p.stock === 0 ? 'var(--danger)' : p.stock < p.min_stock ? '#f39c12' : 'var(--success)';
+      return `<tr>
+        <td><strong>${p.name}</strong></td>
+        <td><span style="font-size:12px;color:var(--text-muted);">${p.category}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:var(--font-mono);font-weight:700;color:${color};">${p.stock}</span>
+            <div style="width:60px;height:6px;background:var(--border);border-radius:3px;">
+              <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
+            </div>
+          </div>
+        </td>
+        <td style="font-family:var(--font-mono);">${p.min_stock}</td>
+        <td style="color:var(--text-muted);font-size:12px;">${p.unit||'-'}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="quickStokMasuk('${p.id}','${p.name.replace(/'/g,"\\'")}')">+ Isi Stok</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">⚠️ Gagal memuat</td></tr>';
+  }
+}
+
+function quickStokMasuk(id, name) {
+  openStokMasuk();
+  setTimeout(() => {
+    addItemToSm({ id, name, cost_price: 0 });
+    document.getElementById('sm-search').value = name;
+  }, 200);
+}
+
+// ── RIWAYAT ─────────────────────────────────────────────────
+function debounceRiwayat() {
+  clearTimeout(debTimer);
+  debTimer = setTimeout(() => loadRiwayat(1), 400);
+}
+
+async function loadRiwayat(page = 1) {
+  riwayatPage = page;
+  const search = document.getElementById('search-riwayat').value;
+  const tbody  = document.getElementById('tbl-riwayat');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">⏳ Memuat...</td></tr>';
+
+  try {
+    const res  = await fetch(`/api/stok/riwayat?page=${page}&search=${encodeURIComponent(search)}`);
+    const data = await res.json();
+    riwayatTotal = data.total;
+
+    if (!data.data.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">Tidak ada riwayat</td></tr>';
+      document.getElementById('riwayat-info').textContent = '';
+      document.getElementById('riwayat-pages').innerHTML = '';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(r => {
+      const isIn   = r.type === 'in';
+      const color  = isIn ? 'var(--success)' : 'var(--danger)';
+      const sign   = isIn ? '+' : '-';
+      const tgl    = r.created_at ? new Date(r.created_at).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+      return `<tr>
+        <td style="font-size:11px;color:var(--text-muted);">${tgl}</td>
+        <td><strong>${r.product}</strong><br><span style="font-size:11px;color:var(--text-muted);">${r.unit}</span></td>
+        <td><span class="badge ${isIn ? 'badge-success' : 'badge-danger'}">${isIn ? 'MASUK' : 'KELUAR'}</span></td>
+        <td style="font-family:var(--font-mono);">${r.stock_before}</td>
+        <td style="font-family:var(--font-mono);font-weight:700;color:${color};">${sign}${r.quantity}</td>
+        <td style="font-family:var(--font-mono);font-weight:700;">${r.stock_after}</td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.note||'-'}</td>
+        <td style="font-size:12px;">${r.user}</td>
+      </tr>`;
+    }).join('');
+
+    const from = (page-1)*20+1, to = Math.min(page*20, riwayatTotal);
+    document.getElementById('riwayat-info').textContent = `${from}–${to} dari ${riwayatTotal.toLocaleString('id-ID')}`;
+    renderRiwayatPages(data.total_page, page);
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:20px;">⚠️ Gagal memuat</td></tr>';
+  }
+}
+
+function renderRiwayatPages(total_page, current) {
+  const el = document.getElementById('riwayat-pages');
+  if (total_page <= 1) { el.innerHTML = ''; return; }
+  let html = `<button class="kat-pill" onclick="loadRiwayat(${current-1})" ${current===1?'disabled':''} style="padding:4px 10px;">‹</button>`;
+  for (let i = Math.max(1,current-2); i <= Math.min(total_page,current+2); i++) {
+    html += `<button class="kat-pill ${i===current?'active':''}" onclick="loadRiwayat(${i})" style="padding:4px 10px;">${i}</button>`;
+  }
+  html += `<button class="kat-pill" onclick="loadRiwayat(${current+1})" ${current===total_page?'disabled':''} style="padding:4px 10px;">›</button>`;
+  el.innerHTML = html;
+}
+
+// ── SUPPLIER ─────────────────────────────────────────────────
+async function loadSupplier() {
+  try {
+    const res  = await fetch('/api/supplier');
+    const data = await res.json();
+    const tbody = document.getElementById('tbl-supplier');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada supplier</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(s => `<tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.phone||'-'}</td>
+      <td>${s.email||'-'}</td>
+      <td style="font-size:12px;color:var(--text-muted);">${s.address||'-'}</td>
+    </tr>`).join('');
+  } catch(e) {}
+}
+
+function openAddSupplier() { document.getElementById('modal-supplier').classList.add('open'); }
+function closeAddSupplier() { document.getElementById('modal-supplier').classList.remove('open'); }
+
+async function simpanSupplier() {
+  const name = document.getElementById('sp-name').value.trim();
+  if (!name) { alert('Nama supplier wajib diisi'); return; }
+  try {
+    const res = await fetch('/api/supplier', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name, phone: document.getElementById('sp-phone').value,
+        email: document.getElementById('sp-email').value,
+        address: document.getElementById('sp-address').value,
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeAddSupplier();
+    loadSupplier();
+    window.PosSync?.showToast('Supplier ditambahkan', 'success');
+  } catch(e) { alert('Gagal: ' + e.message); }
+}
+
+// ── MODAL STOK MASUK ─────────────────────────────────────────
+function openStokMasuk() {
+  smItems = [];
+  renderSmItems();
+  document.getElementById('sm-search').value = '';
+  document.getElementById('sm-produk-hasil').style.display = 'none';
+  document.getElementById('modal-stok').classList.add('open');
+  document.getElementById('sm-search').focus();
+}
+function closeStokMasuk() { document.getElementById('modal-stok').classList.remove('open'); }
+
+function debounceSearchProduk() {
+  clearTimeout(debTimer2);
+  debTimer2 = setTimeout(searchProdukSm, 350);
+}
+
+async function searchProdukSm() {
+  const q   = document.getElementById('sm-search').value.trim();
+  const box = document.getElementById('sm-produk-hasil');
+  if (!q) { box.style.display = 'none'; return; }
+
+  try {
+    const res  = await fetch(`/api/kasir/produk?search=${encodeURIComponent(q)}&per_page=8`);
+    const data = await res.json();
+    if (!data.data || !data.data.length) { box.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:13px;">Tidak ditemukan</div>'; box.style.display=''; return; }
+    box.innerHTML = data.data.map(p => `
+      <div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"
+           onmouseenter="this.style.background='var(--hover)'" onmouseleave="this.style.background=''"
+           onclick='addItemToSm(${JSON.stringify(p)})'>
+        <span style="font-size:13px;">${p.name}</span>
+        <span style="font-size:11px;color:var(--text-muted);">Stok: ${p.stock||0}</span>
+      </div>`).join('');
+    box.style.display = '';
+  } catch(e) { box.style.display = 'none'; }
+}
+
+function addItemToSm(prod) {
+  document.getElementById('sm-produk-hasil').style.display = 'none';
+  document.getElementById('sm-search').value = '';
+  const existing = smItems.find(i => i.id === prod.id);
+  if (existing) { existing.qty++; renderSmItems(); return; }
+  smItems.push({ id: prod.id, name: prod.name, qty: 1, cost_price: prod.cost_price || 0 });
+  renderSmItems();
+}
+
+function removeSmItem(idx) { smItems.splice(idx, 1); renderSmItems(); }
+
+function renderSmItems() {
+  const tbody   = document.getElementById('sm-items');
+  const emptyEl = document.getElementById('sm-empty');
+  const totRow  = document.getElementById('sm-total-row');
+
+  if (!smItems.length) {
+    tbody.innerHTML = '';
+    emptyEl.style.display = '';
+    totRow.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  totRow.style.display = '';
+
+  let total = 0;
+  tbody.innerHTML = smItems.map((item, idx) => {
+    const sub = item.qty * item.cost_price;
+    total += sub;
+    return `<tr>
+      <td style="font-size:13px;">${item.name}</td>
+      <td><input type="number" min="1" value="${item.qty}" class="form-control" style="width:70px;padding:4px 8px;" oninput="smItems[${idx}].qty=parseInt(this.value)||1;calcSmTotal()"></td>
+      <td><input type="number" min="0" value="${item.cost_price}" class="form-control" style="width:110px;padding:4px 8px;" placeholder="Harga beli" oninput="smItems[${idx}].cost_price=parseFloat(this.value)||0;calcSmTotal()"></td>
+      <td style="font-family:var(--font-mono);font-size:12px;" id="sm-sub-${idx}">Rp ${sub.toLocaleString('id-ID')}</td>
+      <td><button onclick="removeSmItem(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('sm-total').textContent = 'Rp ' + total.toLocaleString('id-ID');
+}
+
+function calcSmTotal() {
+  let total = 0;
+  smItems.forEach((item, idx) => {
+    const sub = item.qty * item.cost_price;
+    total += sub;
+    const el = document.getElementById('sm-sub-' + idx);
+    if (el) el.textContent = 'Rp ' + sub.toLocaleString('id-ID');
+  });
+  document.getElementById('sm-total').textContent = 'Rp ' + total.toLocaleString('id-ID');
+}
+
+async function simpanStokMasuk() {
+  if (!smItems.length) { alert('Tambahkan minimal 1 produk'); return; }
+  const btn = document.getElementById('btn-simpan-stok');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  try {
+    const res = await fetch('/api/stok/masuk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supplier_id: document.getElementById('sm-supplier').value || null,
+        note:        document.getElementById('sm-note').value,
+        items:       smItems,
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeStokMasuk();
+    loadStokRendah();
+    window.PosSync?.showToast(`✅ Stok masuk tersimpan`, 'success');
+  } catch(e) {
+    alert('Gagal simpan: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Simpan Stok Masuk';
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+loadStokRendah();
+</script>
+<style>
+.tab-btn { background:none;border:none;padding:10px 16px;font-size:13px;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:600;transition:all .2s; }
+.tab-btn.active { color:var(--accent);border-bottom-color:var(--accent); }
+.tab-btn:hover:not(.active) { color:var(--text-primary); }
+</style>
+{% endblock %}

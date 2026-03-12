@@ -105,99 +105,241 @@
     </div>
   </div>
 </div>
+<div class="two-col" style="margin-top:20px;">
+  <!-- GRAFIK TREN PENJUALAN -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;">Tren Penjualan</div>
+      <div style="display:flex;gap:6px;">
+        <button class="kat-pill active" id="g-7" onclick="setGrafik(7)" style="padding:4px 10px;font-size:11px;">7 Hari</button>
+        <button class="kat-pill" id="g-14" onclick="setGrafik(14)" style="padding:4px 10px;font-size:11px;">14 Hari</button>
+        <button class="kat-pill" id="g-30" onclick="setGrafik(30)" style="padding:4px 10px;font-size:11px;">30 Hari</button>
+      </div>
+    </div>
+    <canvas id="chart-tren" height="200"></canvas>
+  </div>
+
+  <!-- GRAFIK METODE BAYAR -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;">Metode Pembayaran (Bulan Ini)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center;">
+      <canvas id="chart-metode" height="180"></canvas>
+      <div id="metode-legend" style="display:flex;flex-direction:column;gap:8px;font-size:13px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOP PRODUK TERLARIS -->
+<div class="card" style="margin-top:20px;">
+  <div style="font-weight:700;font-size:14px;margin-bottom:16px;">Top Produk Terlaris (Bulan Ini)</div>
+  <div id="chart-produk-wrap" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-const REFRESH_INTERVAL = 15000; // polling tiap 15 detik
+// ── REALTIME POLLING ──────────────────────────────────────
+let grafikHari = 7;
+let chartTren  = null;
+let chartMetode= null;
 
-function fmtRp(n) {
-  return 'Rp ' + Number(n).toLocaleString('id-ID');
-}
-
-function animateValue(el, newText) {
-  // Flash animasi saat nilai berubah
-  if (el && el.textContent !== newText) {
-    el.style.transition = 'opacity 0.2s';
-    el.style.opacity    = '0';
-    setTimeout(() => {
-      el.textContent  = newText;
-      el.style.opacity = '1';
-    }, 200);
-  }
-}
-
-function renderTabelTransaksi(txs) {
-  const wrap = document.getElementById('tabel-transaksi');
-  if (!wrap) return;
-  if (!txs.length) {
-    wrap.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Belum ada transaksi hari ini</p>';
-    return;
-  }
-  wrap.innerHTML = `<table>
-    <thead><tr><th>Invoice</th><th>Pelanggan</th><th>Bayar</th><th>Total</th></tr></thead>
-    <tbody>${txs.map(tx => `<tr>
-      <td style="font-family:var(--font-mono);font-size:12px;">${tx.invoice_number}</td>
-      <td>${tx.customer}</td>
-      <td><span class="badge badge-info">${tx.payment_method}</span></td>
-      <td style="font-family:var(--font-mono);font-weight:700;">${fmtRp(tx.total)}</td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
-
-function renderTabelStok(stok) {
-  const wrap = document.getElementById('tabel-stok');
-  if (!wrap) return;
-  if (!stok.length) {
-    wrap.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:30px 0;font-size:13px;">Semua stok aman ✓</p>';
-    return;
-  }
-  wrap.innerHTML = `<table>
-    <thead><tr><th>Produk</th><th>Stok</th><th>Status</th></tr></thead>
-    <tbody>${stok.map(p => `<tr>
-      <td>${p.name}</td>
-      <td style="font-family:var(--font-mono);">${p.stock} ${p.unit}</td>
-      <td><span class="badge ${p.stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.stock === 0 ? 'Habis' : 'Rendah'}</span></td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
-
-async function refreshDashboard() {
+async function refreshStats() {
   const dot   = document.getElementById('refresh-dot');
   const label = document.getElementById('refresh-label');
+  dot.style.background = '#f39c12';
+  label.textContent    = 'Memperbarui...';
+
   try {
-    // Animasi dot saat fetch
-    if (dot) dot.style.background = 'var(--warning)';
-
     const res  = await fetch('/api/dashboard/stats');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-    // Update stat cards dengan animasi
-    animateValue(document.getElementById('stat-pendapatan'), fmtRp(data.pendapatan_bulan_ini));
-    // Update label bulan jika berganti bulan
-    const labelEl = document.querySelector('[id="stat-pendapatan"]')?.closest('.stat-card')?.querySelector('.stat-label');
-    if (labelEl && data.bulan_label) labelEl.textContent = 'Pendapatan ' + data.bulan_label;
-    animateValue(document.getElementById('stat-transaksi'),  String(data.total_transaksi));
-    animateValue(document.getElementById('stat-produk'),     String(data.total_produk));
-    animateValue(document.getElementById('stat-pelanggan'),  String(data.total_pelanggan));
+    animateValue('stat-pendapatan', 'Rp ' + data.pendapatan_bulan_ini.toLocaleString('id-ID'));
+    animateValue('stat-transaksi', data.total_transaksi.toLocaleString('id-ID'));
+    animateValue('stat-produk', data.total_produk.toLocaleString('id-ID'));
+    animateValue('stat-pelanggan', data.total_pelanggan.toLocaleString('id-ID'));
 
-    // Update tabel
-    renderTabelTransaksi(data.transaksi_terbaru);
-    renderTabelStok(data.stok_rendah);
+    if (data.transaksi_terbaru) {
+      document.getElementById('tabel-transaksi').innerHTML = renderTransaksiTable(data.transaksi_terbaru);
+    }
+    if (data.stok_rendah) {
+      document.getElementById('tabel-stok').innerHTML = renderStokTable(data.stok_rendah);
+    }
 
-    // Dot hijau = sukses
-    if (dot) dot.style.background = 'var(--success)';
-    if (label) label.textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-
+    dot.style.background = 'var(--success)';
+    label.textContent    = 'Update ' + new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
   } catch(e) {
-    if (dot)   dot.style.background   = 'var(--danger)';
-    if (label) label.textContent = 'Gagal refresh';
-    console.warn('[Dashboard] Refresh error:', e);
+    dot.style.background = 'var(--danger)';
+    label.textContent    = 'Gagal refresh';
   }
 }
 
-// Mulai polling setelah halaman load
-setInterval(refreshDashboard, REFRESH_INTERVAL);
+function animateValue(id, newVal) {
+  const el = document.getElementById(id);
+  if (!el || el.textContent === newVal) return;
+  el.style.opacity = '0.3';
+  el.style.transition = 'opacity 0.2s';
+  setTimeout(() => { el.textContent = newVal; el.style.opacity = '1'; }, 200);
+}
+
+function renderTransaksiTable(txs) {
+  if (!txs.length) return '<p style="text-align:center;color:var(--text-muted);padding:20px;">Belum ada transaksi</p>';
+  return `<table>
+    <thead><tr><th>Invoice</th><th>Kasir</th><th>Metode</th><th>Total</th></tr></thead>
+    <tbody>
+    ${txs.map(t => `<tr>
+      <td style="font-family:var(--font-mono);font-size:12px;">${t.invoice_number||'-'}</td>
+      <td>${t.cashier||'-'}</td>
+      <td><span class="badge badge-info">${t.payment_method||'-'}</span></td>
+      <td style="font-family:var(--font-mono);font-weight:700;">Rp ${Number(t.total).toLocaleString('id-ID')}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+function renderStokTable(items) {
+  if (!items.length) return '<p style="text-align:center;color:var(--success);padding:20px;">✅ Semua stok aman</p>';
+  return `<table>
+    <thead><tr><th>Produk</th><th>Stok</th></tr></thead>
+    <tbody>
+    ${items.map(p => `<tr>
+      <td>${p.name}</td>
+      <td style="font-family:var(--font-mono);color:var(--danger);font-weight:700;">${p.stock}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── GRAFIK TREN ──────────────────────────────────────────
+async function loadGrafik(hari) {
+  try {
+    const res  = await fetch(`/api/grafik/penjualan?hari=${hari}`);
+    const data = await res.json();
+
+    const labels     = data.map(d => d.label);
+    const pendapatan = data.map(d => d.pendapatan);
+    const jumlah     = data.map(d => d.jumlah_tx);
+
+    if (chartTren) chartTren.destroy();
+    const ctx = document.getElementById('chart-tren').getContext('2d');
+    chartTren = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Pendapatan',
+            data: pendapatan,
+            backgroundColor: 'rgba(31,105,164,0.7)',
+            borderColor: 'rgba(31,105,164,1)',
+            borderWidth: 1,
+            borderRadius: 4,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Transaksi',
+            data: jumlah,
+            type: 'line',
+            borderColor: '#2ecc71',
+            backgroundColor: 'rgba(46,204,113,0.1)',
+            fill: false,
+            tension: 0.4,
+            pointRadius: 4,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#aaa', font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ctx.datasetIndex === 0
+                ? ' Rp ' + ctx.parsed.y.toLocaleString('id-ID')
+                : ' ' + ctx.parsed.y + ' transaksi'
+            }
+          }
+        },
+        scales: {
+          x:  { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y:  { position:'left',  ticks: { color:'#888', font:{size:10}, callback: v => 'Rp ' + (v/1000).toFixed(0)+'k' }, grid: { color:'rgba(255,255,255,0.05)' } },
+          y1: { position:'right', ticks: { color:'#2ecc71', font:{size:10} }, grid: { drawOnChartArea:false } },
+        }
+      }
+    });
+  } catch(e) { console.warn('grafik tren error', e); }
+}
+
+function setGrafik(hari) {
+  grafikHari = hari;
+  [7,14,30].forEach(h => document.getElementById('g-'+h)?.classList.toggle('active', h===hari));
+  loadGrafik(hari);
+}
+
+// ── GRAFIK METODE BAYAR ─────────────────────────────────
+async function loadGrafikMetode() {
+  try {
+    const res  = await fetch('/api/grafik/metode');
+    const data = await res.json();
+
+    const labels = Object.keys(data);
+    const values = Object.values(data);
+    const total  = values.reduce((a,b) => a+b, 0);
+    const colors = ['#1F69A4','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c'];
+
+    if (chartMetode) chartMetode.destroy();
+    const ctx = document.getElementById('chart-metode').getContext('2d');
+    chartMetode = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: colors.slice(0,labels.length), borderWidth: 0 }] },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed} transaksi` } }
+        },
+        cutout: '65%',
+      }
+    });
+
+    document.getElementById('metode-legend').innerHTML = labels.map((l,i) => `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${colors[i]};flex-shrink:0;"></div>
+        <span>${l.toUpperCase()}</span>
+        <span style="margin-left:auto;color:var(--text-muted);">${values[i]} <small>(${Math.round(values[i]/total*100)}%)</small></span>
+      </div>`).join('');
+  } catch(e) { console.warn('grafik metode error', e); }
+}
+
+// ── GRAFIK PRODUK TERLARIS ───────────────────────────────
+async function loadProdukTerlaris() {
+  try {
+    const res  = await fetch('/api/grafik/produk_terlaris');
+    const data = await res.json();
+    const wrap = document.getElementById('chart-produk-wrap');
+    if (!data.length) { wrap.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">Belum ada data bulan ini</p>'; return; }
+    const maxQty = data[0].qty || 1;
+    wrap.innerHTML = data.map((p, i) => `
+      <div style="display:grid;grid-template-columns:24px 1fr 80px 100px;gap:10px;align-items:center;padding:6px 0;">
+        <span style="font-size:12px;color:var(--text-muted);text-align:center;">${i+1}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${p.nama}</div>
+          <div style="height:6px;background:var(--border);border-radius:3px;">
+            <div style="width:${Math.round(p.qty/maxQty*100)}%;height:100%;background:var(--accent);border-radius:3px;transition:width .4s;"></div>
+          </div>
+        </div>
+        <span style="font-family:var(--font-mono);font-size:13px;text-align:right;">${p.qty} pcs</span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-align:right;">Rp ${Number(p.revenue).toLocaleString('id-ID')}</span>
+      </div>`).join('');
+  } catch(e) { console.warn('produk terlaris error', e); }
+}
+
+// ── INIT ─────────────────────────────────────────────────
+refreshStats();
+setInterval(refreshStats, 15000);
+loadGrafik(7);
+loadGrafikMetode();
+loadProdukTerlaris();
 </script>
 {% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Backup & Export — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+  <div class="page-title">Backup & Export Data</div>
+  <div class="page-sub">Download data toko dalam format CSV atau JSON</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+
+  <!-- EXPORT TRANSAKSI -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Export Transaksi
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Dari Tanggal</label>
+          <input type="date" id="tx-dari" class="form-control">
+        </div>
+        <div>
+          <label class="form-label">Sampai</label>
+          <input type="date" id="tx-sampai" class="form-control">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="exportTx('csv')" style="flex:1;">
+          📊 Download CSV
+        </button>
+        <button class="btn btn-ghost" onclick="exportTx('json')" style="flex:1;">
+          {} Download JSON
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT PRODUK -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      </svg>
+      Export Produk
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Export semua produk beserta harga, stok, dan kategori.</p>
+    <button class="btn btn-primary" onclick="exportProduk()" style="width:100%;">
+      📊 Download CSV Produk
+    </button>
+  </div>
+
+  <!-- EXPORT PELANGGAN -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      </svg>
+      Export Pelanggan
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Export data member termasuk poin loyalty dan total belanja.</p>
+    <button class="btn btn-primary" onclick="exportPelanggan()" style="width:100%;">
+      📊 Download CSV Pelanggan
+    </button>
+  </div>
+
+  <!-- INFO DATABASE -->
+  <div class="card" id="db-info-card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+      </svg>
+      Info Database
+    </div>
+    <div id="db-stats" style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--text-muted);">⏳ Memuat...</div>
+  </div>
+
+</div>
+
+<!-- LOG BACKUP -->
+<div class="card">
+  <div style="font-weight:700;font-size:14px;margin-bottom:16px;">Log Export Terakhir</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>Waktu</th></tr></thead>
+      <tbody>
+        {% if logs %}
+        {% for log in logs %}
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px;">{{ log.filename }}</td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ log.created_at }}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted);">Belum ada log export</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set default tanggal hari ini & awal bulan
+document.addEventListener('DOMContentLoaded', () => {
+  const today    = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('tx-dari').value   = firstDay.toISOString().split('T')[0];
+  document.getElementById('tx-sampai').value = today.toISOString().split('T')[0];
+  loadDbStats();
+});
+
+async function exportTx(format) {
+  const dari   = document.getElementById('tx-dari').value;
+  const sampai = document.getElementById('tx-sampai').value;
+  if (!dari || !sampai) { alert('Pilih rentang tanggal'); return; }
+  window.location = `/api/backup/transaksi?dari=${dari}&sampai=${sampai}&format=${format}`;
+}
+
+async function exportProduk() {
+  window.location = '/api/backup/produk';
+}
+
+async function exportPelanggan() {
+  window.location = '/api/backup/pelanggan';
+}
+
+async function loadDbStats() {
+  try {
+    const [txRes, prodRes, custRes] = await Promise.all([
+      fetch('/api/laporan/rekap?dari=2000-01-01&sampai=' + new Date().toISOString().split('T')[0]),
+      fetch('/api/kasir/produk?page=1&per_page=1'),
+      fetch('/api/pelanggan?page=1&per_page=1'),
+    ]);
+    const [txData, prodData, custData] = await Promise.all([txRes.json(), prodRes.json(), custRes.json()]);
+
+    document.getElementById('db-stats').innerHTML = `
+      <div style="display:flex;justify-content:space-between;"><span>Total Transaksi</span><strong>${(txData.total_transaksi||0).toLocaleString('id-ID')}</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Total Produk</span><strong>${(prodData.total||0).toLocaleString('id-ID')}</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Total Pelanggan</span><strong>${(custData.total||0).toLocaleString('id-ID')}</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Total Pendapatan</span><strong style="color:var(--accent);">Rp ${(txData.total_pendapatan||0).toLocaleString('id-ID')}</strong></div>
+    `;
+  } catch(e) {
+    document.getElementById('db-stats').textContent = 'Gagal memuat statistik';
+  }
+}
+</script>
+{% endblock %}

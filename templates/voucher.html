@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Voucher & Promo — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div>
+    <div class="page-title">Voucher & Promo</div>
+    <div class="page-sub">Kelola kode diskon & promosi</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Buat Voucher
+  </button>
+</div>
+
+<div id="voucher-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+  <div style="text-align:center;color:var(--text-muted);padding:40px;grid-column:1/-1;">⏳ Memuat...</div>
+</div>
+
+<!-- MODAL BUAT/EDIT VOUCHER -->
+<div class="modal-overlay" id="modal-voucher">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Buat Voucher Baru</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Kode Voucher *</label>
+          <input type="text" id="v-code" class="form-control" placeholder="DISKON10" style="text-transform:uppercase;">
+        </div>
+        <div>
+          <label class="form-label">Nama Voucher *</label>
+          <input type="text" id="v-name" class="form-control" placeholder="Diskon Lebaran">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Tipe Diskon</label>
+          <select id="v-type" class="form-control" onchange="updateValueLabel()">
+            <option value="pct">Persentase (%)</option>
+            <option value="nominal">Nominal (Rp)</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" id="value-label">Nilai Diskon (%)</label>
+          <input type="number" id="v-value" class="form-control" min="0" placeholder="10">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Min. Pembelian (Rp)</label>
+          <input type="number" id="v-min" class="form-control" min="0" value="0" placeholder="0 = bebas">
+        </div>
+        <div>
+          <label class="form-label">Maks. Pakai (kali)</label>
+          <input type="number" id="v-max" class="form-control" min="0" value="0" placeholder="0 = tak terbatas">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Berlaku Dari</label>
+          <input type="date" id="v-from" class="form-control">
+        </div>
+        <div>
+          <label class="form-label">Berlaku Sampai</label>
+          <input type="date" id="v-until" class="form-control">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" id="btn-save" onclick="save()">Simpan</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let editId = null;
+
+function updateValueLabel() {
+  const t = document.getElementById('v-type').value;
+  document.getElementById('value-label').textContent = t === 'pct' ? 'Nilai Diskon (%)' : 'Nilai Diskon (Rp)';
+}
+
+async function loadVouchers() {
+  const grid = document.getElementById('voucher-grid');
+  try {
+    const res  = await fetch('/api/voucher');
+    const data = await res.json();
+    if (!data.length) {
+      grid.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;grid-column:1/-1;">Belum ada voucher. Buat yang pertama!</div>';
+      return;
+    }
+
+    const statusColor = { active:'var(--success)', inactive:'var(--text-muted)', expired:'var(--danger)', habis:'#f39c12' };
+    const statusLabel = { active:'Aktif', inactive:'Nonaktif', expired:'Kadaluarsa', habis:'Habis' };
+
+    grid.innerHTML = data.map(v => {
+      const today  = new Date().toISOString().split('T')[0];
+      const pct    = v.max_use > 0 ? Math.round((v.used_count / v.max_use) * 100) : 0;
+      return `
+      <div class="card" style="position:relative;overflow:hidden;">
+        <div style="position:absolute;top:12px;right:12px;">
+          <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:${statusColor[v.status]}20;color:${statusColor[v.status]};">${statusLabel[v.status]}</span>
+        </div>
+        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);letter-spacing:1px;margin-bottom:4px;">${v.code}</div>
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;">${v.name}</div>
+        <div style="display:flex;gap:16px;font-size:13px;margin-bottom:12px;">
+          <div>
+            <div style="color:var(--text-muted);font-size:11px;font-weight:600;">DISKON</div>
+            <div style="font-weight:700;color:var(--accent);">${v.type==='pct' ? v.value+'%' : 'Rp '+Number(v.value).toLocaleString('id-ID')}</div>
+          </div>
+          <div>
+            <div style="color:var(--text-muted);font-size:11px;font-weight:600;">MIN BELANJA</div>
+            <div style="font-weight:600;">${v.min_purchase > 0 ? 'Rp '+Number(v.min_purchase).toLocaleString('id-ID') : 'Bebas'}</div>
+          </div>
+          <div>
+            <div style="color:var(--text-muted);font-size:11px;font-weight:600;">DIGUNAKAN</div>
+            <div style="font-weight:600;">${v.used_count} ${v.max_use > 0 ? '/ '+v.max_use : ''}</div>
+          </div>
+        </div>
+        ${v.max_use > 0 ? `<div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:12px;"><div style="width:${pct}%;height:100%;background:var(--accent);border-radius:2px;"></div></div>` : ''}
+        ${v.valid_until ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">📅 Berlaku s/d ${v.valid_until}</div>` : ''}
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(v)})'>Edit</button>
+          <button class="btn btn-sm" style="background:${v.is_active ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.1)'};color:${v.is_active ? 'var(--danger)' : 'var(--success)'};border:none;"
+                  onclick="toggleStatus(${v.id}, ${v.is_active})">${v.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--danger);text-align:center;padding:30px;grid-column:1/-1;">⚠️ Gagal memuat voucher</div>`;
+  }
+}
+
+function openModal() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Buat Voucher Baru';
+  ['v-code','v-name','v-value'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('v-min').value   = '0';
+  document.getElementById('v-max').value   = '0';
+  document.getElementById('v-from').value  = '';
+  document.getElementById('v-until').value = '';
+  document.getElementById('v-type').value  = 'pct';
+  document.getElementById('v-code').disabled = false;
+  updateValueLabel();
+  document.getElementById('modal-voucher').classList.add('open');
+  document.getElementById('v-code').focus();
+}
+
+function openEdit(v) {
+  editId = v.id;
+  document.getElementById('modal-title').textContent = 'Edit Voucher';
+  document.getElementById('v-code').value  = v.code;
+  document.getElementById('v-code').disabled = true;
+  document.getElementById('v-name').value  = v.name;
+  document.getElementById('v-type').value  = v.type;
+  document.getElementById('v-value').value = v.value;
+  document.getElementById('v-min').value   = v.min_purchase || 0;
+  document.getElementById('v-max').value   = v.max_use || 0;
+  document.getElementById('v-from').value  = v.valid_from  || '';
+  document.getElementById('v-until').value = v.valid_until || '';
+  updateValueLabel();
+  document.getElementById('modal-voucher').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-voucher').classList.remove('open'); }
+
+async function save() {
+  const btn  = document.getElementById('btn-save');
+  const code = document.getElementById('v-code').value.trim().toUpperCase();
+  const name = document.getElementById('v-name').value.trim();
+  if (!code || !name) { alert('Kode dan nama wajib diisi'); return; }
+
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  const body = {
+    code, name,
+    type:         document.getElementById('v-type').value,
+    value:        parseFloat(document.getElementById('v-value').value) || 0,
+    min_purchase: parseFloat(document.getElementById('v-min').value)   || 0,
+    max_use:      parseInt(document.getElementById('v-max').value)     || 0,
+    valid_from:   document.getElementById('v-from').value  || null,
+    valid_until:  document.getElementById('v-until').value || null,
+  };
+
+  try {
+    const url    = editId ? `/api/voucher/${editId}` : '/api/voucher';
+    const method = editId ? 'PATCH' : 'POST';
+    const res    = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data   = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeModal();
+    loadVouchers();
+    window.PosSync?.showToast('Voucher disimpan ✅', 'success');
+  } catch(e) {
+    alert('Gagal: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Simpan';
+  }
+}
+
+async function toggleStatus(id, isActive) {
+  try {
+    const res  = await fetch(`/api/voucher/${id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({is_active: !isActive})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    loadVouchers();
+  } catch(e) { alert('Gagal: ' + e.message); }
+}
+
+loadVouchers();
+</script>
+{% endblock %}

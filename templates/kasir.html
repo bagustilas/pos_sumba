@@ -99,9 +99,43 @@
           <span>Subtotal (<span id="qty-total">0</span> item)</span>
           <span id="subtotal-val" style="font-family:var(--font-mono);">Rp 0</span>
         </div>
-        <div class="summary-row" style="display:none;" id="diskon-row">
-          <span>Diskon</span>
-          <span style="color:var(--success);font-family:var(--font-mono);">-Rp 0</span>
+        <div class="summary-row" id="diskon-row" style="display:none;">
+          <span style="display:flex;align-items:center;gap:6px;">
+            Diskon
+            <button onclick="toggleDiskonPanel()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:0;">✏️</button>
+          </span>
+          <span style="color:var(--success);font-family:var(--font-mono);" id="diskon-display">-Rp 0</span>
+        </div>
+        <div id="diskon-panel" style="display:none;background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;margin:4px 0;font-size:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+            <div>
+              <div style="color:var(--text-muted);margin-bottom:3px;">Diskon %</div>
+              <input type="number" id="disc-pct" class="form-control" min="0" max="100" value="0" style="padding:4px 8px;" oninput="applyDiskon()">
+            </div>
+            <div>
+              <div style="color:var(--text-muted);margin-bottom:3px;">Diskon Nominal (Rp)</div>
+              <input type="number" id="disc-nominal" class="form-control" min="0" value="0" style="padding:4px 8px;" oninput="applyDiskon()">
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            <button class="kat-pill" onclick="setDiscPct(5)" style="padding:2px 8px;font-size:11px;">5%</button>
+            <button class="kat-pill" onclick="setDiscPct(10)" style="padding:2px 8px;font-size:11px;">10%</button>
+            <button class="kat-pill" onclick="setDiscPct(15)" style="padding:2px 8px;font-size:11px;">15%</button>
+            <button class="kat-pill" onclick="setDiscPct(20)" style="padding:2px 8px;font-size:11px;">20%</button>
+            <button class="kat-pill" onclick="setDiscPct(0)" style="padding:2px 8px;font-size:11px;color:var(--danger);">✕ Reset</button>
+          </div>
+        </div>
+        <div class="summary-row" id="tax-row" style="display:none;">
+          <span>Pajak (<span id="tax-pct-label">0</span>%)</span>
+          <span id="tax-display" style="font-family:var(--font-mono);">Rp 0</span>
+        </div>
+        <div class="summary-row" id="voucher-row" style="display:none;color:var(--success);">
+          <span>Voucher <span id="voucher-code-label" style="font-family:var(--font-mono);font-size:11px;background:rgba(39,174,96,0.15);padding:1px 5px;border-radius:3px;"></span></span>
+          <span style="font-family:var(--font-mono);" id="voucher-disc-display">-Rp 0</span>
+        </div>
+        <div class="summary-row" id="redeem-row" style="display:none;color:#9b59b6;">
+          <span>🏆 Poin Ditukar (<span id="redeem-pts-label">0</span> pts)</span>
+          <span style="font-family:var(--font-mono);" id="redeem-disc-display">-Rp 0</span>
         </div>
       </div>
 
@@ -109,6 +143,55 @@
       <div class="total-besar">
         <span>TOTAL</span>
         <span id="total-display" style="font-family:var(--font-mono);font-size:22px;font-weight:800;">Rp 0</span>
+      </div>
+
+      <!-- PELANGGAN + LOYALTY ──────────────────────────── -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;display:block;">Pelanggan (Opsional)</label>
+        <div style="position:relative;">
+          <input type="text" id="cust-search" class="form-control" placeholder="Cari nama / no. HP / kode member..."
+                 oninput="searchCust()" autocomplete="off" style="padding-right:32px;">
+          <button id="cust-clear" onclick="clearCust()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;">✕</button>
+        </div>
+        <div id="cust-dropdown" style="display:none;position:absolute;z-index:200;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.3);width:calc(100% - 48px);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+        <div id="cust-selected" style="display:none;margin-top:8px;background:linear-gradient(135deg,rgba(31,105,164,0.15),rgba(31,105,164,0.05));border:1px solid rgba(31,105,164,0.3);border-radius:8px;padding:10px 12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:700;font-size:13px;" id="cust-name-display"></div>
+              <div style="font-size:11px;color:var(--text-muted);" id="cust-meta-display"></div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;color:var(--text-muted);">Poin Aktif</div>
+              <div style="font-size:18px;font-weight:800;color:var(--accent);font-family:var(--font-mono);" id="cust-pts-display">0</div>
+            </div>
+          </div>
+          <!-- Redeem poin -->
+          <div id="redeem-wrap" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(31,105,164,0.2);">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+              <span style="color:var(--text-muted);">Tukar poin:</span>
+              <input type="number" id="redeem-pts" min="0" value="0" class="form-control" style="width:80px;padding:4px 6px;" oninput="applyRedeem()">
+              <span style="color:var(--text-muted);">pts = <strong id="redeem-rp" style="color:var(--success);">Rp 0</strong></span>
+              <button class="btn btn-ghost btn-sm" onclick="redeemAll()" style="margin-left:auto;font-size:11px;">Semua</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VOUCHER ──────────────────────────────────────── -->
+      <div style="margin-bottom:10px;" id="voucher-section">
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;display:block;">Kode Voucher</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="voucher-input" class="form-control" placeholder="Masukkan kode voucher..." style="text-transform:uppercase;flex:1;" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')cekVoucher()">
+          <button class="btn btn-ghost btn-sm" onclick="cekVoucher()">Pakai</button>
+        </div>
+        <div id="voucher-info" style="display:none;margin-top:6px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;padding:8px 10px;font-size:12px;display:flex;justify-content:space-between;align-items:center;">
+          <span id="voucher-name-info"></span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <strong id="voucher-disc-info" style="color:var(--success);font-family:var(--font-mono);"></strong>
+            <button onclick="clearVoucher()" style="background:none;border:none;color:var(--danger);cursor:pointer;">✕</button>
+          </div>
+        </div>
+        <div id="voucher-error" style="display:none;color:var(--danger);font-size:12px;margin-top:4px;"></div>
       </div>
 
       <!-- Metode pembayaran -->
@@ -302,7 +385,6 @@
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
-  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -552,6 +634,9 @@
 // ── STATE ──────────────────────────────────────────────
 let cart       = {};   // {id: {id, name, price, qty, stock, unit}}
 let cartTotal  = 0;
+let cartFinal  = 0;   // total setelah diskon & pajak
+let activeShiftId = null;
+const TAX_PCT  = {{ settings.get('tax_percentage','0')|float }};  // dari settings toko
 let payMethod  = 'cash';
 let gridState  = { page: 1, search: '', category_id: '', total: 0, total_page: 1 };
 let searchTimer = null;
@@ -787,6 +872,12 @@ function clearCart() {
     const b = c.querySelector('.pc-qty-badge');
     if (b) b.style.display = 'none';
   });
+  // Reset pelanggan & voucher
+  clearCust();
+  clearVoucher();
+  if (document.getElementById('disc-pct'))     document.getElementById('disc-pct').value = 0;
+  if (document.getElementById('disc-nominal')) document.getElementById('disc-nominal').value = 0;
+  if (document.getElementById('diskon-panel')) document.getElementById('diskon-panel').style.display = 'none';
 }
 
 function renderCart() {
@@ -798,7 +889,15 @@ function renderCart() {
   cartTotal = items.reduce((s, i) => s + i.price * i.qty, 0);
   const totalQty = items.reduce((s, i) => s + i.qty, 0);
 
-  document.getElementById('total-display').textContent = 'Rp ' + fmt(cartTotal);
+  // Hitung diskon
+  const discPct     = parseFloat(document.getElementById('disc-pct')?.value || 0);
+  const discNominal = parseFloat(document.getElementById('disc-nominal')?.value || 0);
+  const discAmount  = Math.min(discNominal + (cartTotal * discPct / 100) + voucherDisc + redeemDisc, cartTotal);
+  const afterDisc   = cartTotal - discAmount;
+  const taxAmount   = afterDisc * TAX_PCT / 100;
+  cartFinal         = afterDisc + taxAmount;
+
+  document.getElementById('total-display').textContent = 'Rp ' + fmt(cartFinal);
   countEl.textContent = totalQty + ' item';
 
   if (!items.length) {
@@ -814,6 +913,45 @@ function renderCart() {
   summaryEl.style.display = 'block';
   document.getElementById('qty-total').textContent = totalQty;
   document.getElementById('subtotal-val').textContent = 'Rp ' + fmt(cartTotal);
+
+  // Tampilkan baris diskon
+  const diskonRow = document.getElementById('diskon-row');
+  if (discAmount > 0) {
+    diskonRow.style.display = '';
+    document.getElementById('diskon-display').textContent = '-Rp ' + fmt(discAmount);
+  } else {
+    diskonRow.style.display = 'none';
+  }
+
+  // Tampilkan baris pajak
+  const taxRow = document.getElementById('tax-row');
+  if (TAX_PCT > 0) {
+    taxRow.style.display = '';
+    document.getElementById('tax-pct-label').textContent = TAX_PCT;
+    document.getElementById('tax-display').textContent = 'Rp ' + fmt(taxAmount);
+  } else {
+    taxRow.style.display = 'none';
+  }
+
+  // Tampilkan baris voucher
+  const voucherRow = document.getElementById('voucher-row');
+  if (voucherDisc > 0 && voucherData) {
+    voucherRow.style.display = '';
+    document.getElementById('voucher-code-label').textContent = voucherData.code;
+    document.getElementById('voucher-disc-display').textContent = '-Rp ' + fmt(voucherDisc);
+  } else {
+    voucherRow.style.display = 'none';
+  }
+
+  // Tampilkan baris redeem poin
+  const redeemRow = document.getElementById('redeem-row');
+  if (redeemDisc > 0) {
+    redeemRow.style.display = '';
+    document.getElementById('redeem-pts-label').textContent = redeemPts.toLocaleString('id-ID');
+    document.getElementById('redeem-disc-display').textContent = '-Rp ' + fmt(redeemDisc);
+  } else {
+    redeemRow.style.display = 'none';
+  }
 
   container.innerHTML = items.map(item => `
     <div class="cart-item">
@@ -848,16 +986,16 @@ function setCash(val) {
 }
 
 function setExact() {
-  document.getElementById('amount-paid').value = cartTotal;
+  document.getElementById('amount-paid').value = cartFinal;
   updateKembalian();
 }
 
 function updateKembalian() {
   const paid = parseFloat(document.getElementById('amount-paid').value) || 0;
   const row  = document.getElementById('kembalian-row');
-  if (payMethod === 'cash' && paid > 0 && cartTotal > 0) {
+  if (payMethod === 'cash' && paid > 0 && cartFinal > 0) {
     row.style.display = 'block';
-    const kembalian = paid - cartTotal;
+    const kembalian = paid - cartFinal;
     document.getElementById('kembalian-val').textContent = 'Rp ' + fmt(Math.max(kembalian, 0));
     row.style.borderColor = kembalian < 0 ? 'rgba(231,76,60,0.3)' : 'rgba(46,204,113,0.3)';
     row.style.background  = kembalian < 0 ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.1)';
@@ -868,14 +1006,206 @@ function updateKembalian() {
   }
 }
 
+// ── DISKON ─────────────────────────────────────────────
+function toggleDiskonPanel() {
+  const panel = document.getElementById('diskon-panel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+
+function applyDiskon() { renderCart(); updateKembalian(); }
+function setDiscPct(pct) {
+  document.getElementById('disc-pct').value     = pct;
+  document.getElementById('disc-nominal').value = 0;
+  applyDiskon();
+}
+
+// ── BARCODE SCAN ───────────────────────────────────────
+let barcodeBuffer = '';
+let barcodeTimer  = null;
+
+document.addEventListener('keydown', (e) => {
+  // Tangkap input barcode scanner (biasanya sangat cepat + Enter)
+  if (e.key === 'Enter' && barcodeBuffer.length >= 4) {
+    handleBarcode(barcodeBuffer);
+    barcodeBuffer = '';
+    return;
+  }
+  if (e.key.length === 1) {
+    barcodeBuffer += e.key;
+    clearTimeout(barcodeTimer);
+    barcodeTimer = setTimeout(() => { barcodeBuffer = ''; }, 120);
+  }
+});
+
+async function handleBarcode(barcode) {
+  // Jangan proses jika focus di input text lain
+  const active = document.activeElement;
+  if (active && active.tagName === 'INPUT' && active.type === 'text' && active.id !== 'search-produk') return;
+
+  try {
+    const res = await fetch(`/api/produk/barcode/${encodeURIComponent(barcode)}`);
+    if (!res.ok) {
+      window.PosSync?.showToast(`Barcode ${barcode} tidak ditemukan`, 'error');
+      return;
+    }
+    const prod = await res.json();
+    addToCart(prod);
+    window.PosSync?.showToast(`✓ ${prod.name} ditambahkan via scan`, 'success');
+  } catch(e) {
+    console.warn('Barcode scan error:', e);
+  }
+}
+
+// ── PELANGGAN & LOYALTY ────────────────────────────────
+let selectedCust   = null;
+let voucherData    = null;
+let voucherDisc    = 0;
+let redeemPts      = 0;
+let redeemDisc     = 0;
+let custDebTimer   = null;
+const REDEEM_RATE  = 100; // Rp per poin (default, akan override dari settings)
+
+function searchCust() {
+  clearTimeout(custDebTimer);
+  custDebTimer = setTimeout(async () => {
+    const q = document.getElementById('cust-search').value.trim();
+    const dd = document.getElementById('cust-dropdown');
+    if (!q) { dd.style.display = 'none'; return; }
+
+    try {
+      const res  = await fetch(`/api/pelanggan/cari?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!data.length) { dd.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--text-muted);">Tidak ditemukan</div>'; dd.style.display = ''; return; }
+      dd.innerHTML = data.map(c => `
+        <div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;"
+             onmouseenter="this.style.background='var(--hover)'" onmouseleave="this.style.background=''"
+             onclick='selectCust(${JSON.stringify(c)})'>
+          <span style="font-size:13px;font-weight:600;">${c.name} <span style="font-weight:400;color:var(--text-muted);">${c.phone||''}</span></span>
+          <span style="font-size:11px;color:var(--accent);">🏆 ${(c.points||0).toLocaleString('id-ID')} pts</span>
+        </div>`).join('');
+      dd.style.display = '';
+    } catch(e) { dd.style.display = 'none'; }
+  }, 300);
+}
+
+function selectCust(c) {
+  selectedCust = c;
+  document.getElementById('cust-search').value = c.name;
+  document.getElementById('cust-dropdown').style.display = 'none';
+  document.getElementById('cust-clear').style.display = '';
+  document.getElementById('cust-selected').style.display = '';
+  document.getElementById('cust-name-display').textContent = c.name;
+  document.getElementById('cust-meta-display').textContent = `${c.member_code||''} · ${c.phone||''}`;
+  document.getElementById('cust-pts-display').textContent  = (c.points||0).toLocaleString('id-ID');
+  document.getElementById('redeem-pts').max = c.points || 0;
+  document.getElementById('redeem-pts').value = 0;
+  redeemPts  = 0;
+  redeemDisc = 0;
+  renderCart();
+}
+
+function clearCust() {
+  selectedCust = null;
+  document.getElementById('cust-search').value = '';
+  document.getElementById('cust-clear').style.display = 'none';
+  document.getElementById('cust-selected').style.display = 'none';
+  document.getElementById('cust-dropdown').style.display = 'none';
+  redeemPts  = 0;
+  redeemDisc = 0;
+  renderCart();
+}
+
+// Klik di luar dropdown tutup
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#cust-search') && !e.target.closest('#cust-dropdown')) {
+    document.getElementById('cust-dropdown').style.display = 'none';
+  }
+});
+
+function applyRedeem() {
+  const pts = parseInt(document.getElementById('redeem-pts').value) || 0;
+  const maxPts = selectedCust ? (selectedCust.points || 0) : 0;
+  redeemPts  = Math.min(pts, maxPts);
+  redeemDisc = redeemPts * REDEEM_RATE;
+  document.getElementById('redeem-rp').textContent = 'Rp ' + redeemDisc.toLocaleString('id-ID');
+  renderCart();
+}
+
+function redeemAll() {
+  if (!selectedCust) return;
+  document.getElementById('redeem-pts').value = selectedCust.points || 0;
+  applyRedeem();
+}
+
+// ── VOUCHER ───────────────────────────────────────────
+async function cekVoucher() {
+  const code   = document.getElementById('voucher-input').value.trim().toUpperCase();
+  const errEl  = document.getElementById('voucher-error');
+  const infoEl = document.getElementById('voucher-info');
+  errEl.style.display  = 'none';
+  infoEl.style.display = 'none';
+
+  if (!code) return;
+
+  try {
+    const res  = await fetch('/api/voucher/cek', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ code, subtotal: cartTotal })
+    });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    voucherData = data.voucher;
+    voucherDisc = data.discount;
+
+    document.getElementById('voucher-name-info').textContent = `✅ ${data.voucher.name}`;
+    document.getElementById('voucher-disc-info').textContent = '-Rp ' + voucherDisc.toLocaleString('id-ID');
+    infoEl.style.display = 'flex';
+    renderCart();
+  } catch(e) {
+    errEl.textContent   = e.message;
+    errEl.style.display = '';
+    voucherData = null; voucherDisc = 0;
+    renderCart();
+  }
+}
+
+function clearVoucher() {
+  voucherData = null; voucherDisc = 0;
+  document.getElementById('voucher-input').value = '';
+  document.getElementById('voucher-info').style.display = 'none';
+  document.getElementById('voucher-error').style.display = 'none';
+  renderCart();
+}
+
+// ── SHIFT STATUS DI KASIR ──────────────────────────────
+async function checkShift() {
+  try {
+    const res  = await fetch('/api/shift/status');
+    const data = await res.json();
+    if (data.shift) {
+      activeShiftId = data.shift.id;
+      const info = document.getElementById('sub-info');
+      if (info) {
+        info.textContent = `Shift aktif sejak ${new Date(data.shift.opened_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})} · Modal: Rp ${Number(data.shift.opening_cash).toLocaleString('id-ID')}`;
+      }
+    }
+  } catch(e) { /* shift opsional */ }
+}
+checkShift();
+
 // ── PROSES TRANSAKSI ───────────────────────────────────
 async function prosesTransaksi() {
   const items = Object.values(cart);
   if (!items.length) { alert('Keranjang masih kosong!'); return; }
 
   const paid = parseFloat(document.getElementById('amount-paid').value) || 0;
-  if (payMethod === 'cash' && paid < cartTotal) {
-    alert('Jumlah bayar kurang! Total: Rp ' + fmt(cartTotal)); return;
+  const discPct     = parseFloat(document.getElementById('disc-pct')?.value || 0);
+  const discNominal = parseFloat(document.getElementById('disc-nominal')?.value || 0);
+
+  if (payMethod === 'cash' && paid < cartFinal) {
+    alert('Jumlah bayar kurang! Total: Rp ' + fmt(cartFinal)); return;
   }
 
   const btn = document.getElementById('btn-bayar');
@@ -883,19 +1213,24 @@ async function prosesTransaksi() {
   btn.innerHTML = '⏳ Memproses...';
 
   const txData = {
-    items:          items.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-    payment_method: payMethod,
-    amount_paid:    payMethod === 'cash' ? paid : cartTotal,
+    items:           items.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, discount: i.discount || 0 })),
+    payment_method:  payMethod,
+    amount_paid:     payMethod === 'cash' ? paid : cartFinal,
+    discount_pct:    discPct,
+    discount_nominal:discNominal,
+    voucher_code:    voucherData ? voucherData.code : '',
+    voucher_discount:voucherDisc,
+    points_used:     redeemPts,
+    customer_id:     selectedCust ? selectedCust.id : null,
+    shift_id:        activeShiftId || null,
   };
 
   try {
-    // Gunakan PosSync — otomatis handle online/offline
     const result = window.PosSync
       ? await window.PosSync.submitTransaction(txData)
       : await submitOnline(txData);
 
     if (result.success) {
-      // Tampilkan struk berbeda jika offline
       if (result.offline) {
         showStruk({ ...result.data, items: txData.items, offline: true }, paid);
       } else {
@@ -955,12 +1290,18 @@ function showStruk(data, paid) {
     <hr class="struk-divider">
     <div class="struk-row"><span>Invoice</span><span style="font-weight:700;">${data.invoice}</span></div>
     <div class="struk-row"><span>Tanggal</span><span>${now}</span></div>
+    ${selectedCust ? `<div class="struk-row"><span>Pelanggan</span><span>${selectedCust.name}</span></div>` : ''}
+    ${selectedCust ? `<div class="struk-row"><span>Member</span><span>${selectedCust.member_code||'-'}</span></div>` : ''}
     <hr class="struk-divider">
     ${itemRows}
     <hr class="struk-divider">
+    ${data.discount > 0 ? `<div class="struk-row"><span>Subtotal</span><span>Rp ${fmt(data.subtotal)}</span></div>` : ''}
+    ${data.discount > 0 ? `<div class="struk-row" style="color:#e74c3c;"><span>Diskon</span><span>-Rp ${fmt(data.discount)}</span></div>` : ''}
+    ${data.tax > 0 ? `<div class="struk-row"><span>Pajak</span><span>+Rp ${fmt(data.tax)}</span></div>` : ''}
     <div class="struk-row struk-total"><span>TOTAL</span><span>Rp ${fmt(data.total)}</span></div>
     <div class="struk-row"><span>Bayar</span><span>Rp ${fmt(paid || data.total)}</span></div>
     <div class="struk-row"><span>Kembalian</span><span style="color:green;font-weight:700;">Rp ${fmt(data.change)}</span></div>
+    ${data.points_earned > 0 ? `<hr class="struk-divider"><div class="struk-row" style="color:#1F69A4;font-weight:700;"><span>🏆 Poin Didapat</span><span>+${data.points_earned} pts</span></div>` : ''}
     <hr class="struk-divider">
     <div style="font-size:11px;color:#777;margin-top:4px;">${STORE.footer} 🙏</div>
   `;

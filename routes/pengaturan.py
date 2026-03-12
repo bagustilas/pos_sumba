@@ -24,14 +24,27 @@ def api_save():
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=representation",
+        "Prefer": "return=representation",
     }
-    rows = [{"key": k, "value": v} for k, v in data.items()]
-    res  = req.post(
-        f"{SUPABASE_URL}/rest/v1/settings",
-        headers=headers,
-        json=rows
-    )
-    if not res.ok:
-        return jsonify({"error": res.text}), 500
+
+    errors = []
+    for k, v in data.items():
+        # PATCH per key — paling aman karena row sudah pasti ada
+        res = req.patch(
+            f"{SUPABASE_URL}/rest/v1/settings?key=eq.{k}",
+            headers=headers,
+            json={"value": str(v), "updated_at": "now()"},
+        )
+        if not res.ok:
+            # Jika row belum ada, INSERT
+            res2 = req.post(
+                f"{SUPABASE_URL}/rest/v1/settings",
+                headers={**headers, "Prefer": "return=representation"},
+                json={"key": k, "value": str(v)},
+            )
+            if not res2.ok:
+                errors.append(f"{k}: {res2.text}")
+
+    if errors:
+        return jsonify({"error": "; ".join(errors)}), 500
     return jsonify({"success": True})
