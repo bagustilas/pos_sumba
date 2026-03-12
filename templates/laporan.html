@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}Laporan — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div>
+    <div class="page-title">Laporan Transaksi</div>
+    <div class="page-sub">Riwayat & rekap penjualan</div>
+  </div>
+  <button class="btn btn-primary" onclick="exportCSV()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Export CSV
+  </button>
+</div>
+
+<!-- REKAP CARD -->
+<div class="stat-grid" style="margin-bottom:20px;" id="rekap-grid">
+  <div class="stat-card">
+    <div class="stat-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+    <div class="stat-label">Total Pendapatan</div>
+    <div class="stat-value" id="rek-pendapatan">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg></div>
+    <div class="stat-label">Jumlah Transaksi</div>
+    <div class="stat-value" id="rek-transaksi">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L2 7h20z"/></svg></div>
+    <div class="stat-label">Rata-rata / Transaksi</div>
+    <div class="stat-value" id="rek-rata">—</div>
+  </div>
+  <div class="stat-card" id="rek-metode-card">
+    <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+    <div class="stat-label">Metode Terbanyak</div>
+    <div class="stat-value" id="rek-metode">—</div>
+  </div>
+</div>
+
+<!-- FILTER -->
+<div class="card" style="margin-bottom:16px;">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+    <div style="flex:1;min-width:130px;">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:4px;">DARI TANGGAL</label>
+      <input type="date" id="filter-dari" class="form-control" style="width:100%;">
+    </div>
+    <div style="flex:1;min-width:130px;">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:4px;">SAMPAI TANGGAL</label>
+      <input type="date" id="filter-sampai" class="form-control" style="width:100%;">
+    </div>
+    <div style="flex:1;min-width:130px;">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:4px;">METODE BAYAR</label>
+      <select id="filter-metode" class="form-control" style="width:100%;">
+        <option value="">Semua Metode</option>
+        <option value="cash">Tunai</option>
+        <option value="transfer">Transfer</option>
+        <option value="qris">QRIS</option>
+        <option value="debit">Debit</option>
+      </select>
+    </div>
+    <div style="flex:2;min-width:160px;">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:4px;">CARI INVOICE</label>
+      <input type="text" id="filter-search" class="form-control" placeholder="No. Invoice..." style="width:100%;" oninput="debounceLoad()">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="loadData()">🔍 Cari</button>
+      <button class="btn btn-ghost" onclick="resetFilter()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- TABEL TRANSAKSI -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="font-weight:700;font-size:14px;">Daftar Transaksi</div>
+    <span id="tbl-info" style="font-size:12px;color:var(--text-muted);"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Tanggal & Waktu</th>
+          <th>Kasir</th>
+          <th>Metode</th>
+          <th>Total</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body">
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px;">⏳ Memuat data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PAGINATION -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
+    <span id="page-info" style="font-size:12px;color:var(--text-muted);"></span>
+    <div style="display:flex;gap:6px;" id="page-btns"></div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL ITEM -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-title">Detail Transaksi</div>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div id="detail-body" style="padding:8px 0;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeDetail()">Tutup</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let state = { page: 1, total: 0, total_page: 1 };
+let allData = []; // simpan semua data untuk CSV export
+let debTimer = null;
+
+// ── INIT ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Default filter: bulan ini
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('filter-dari').value   = toDateStr(firstDay);
+  document.getElementById('filter-sampai').value = toDateStr(today);
+  loadData();
+});
+
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function fmt(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+function fmtDate(s) {
+  if (!s) return '-';
+  const d = new Date(s);
+  return d.toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'})
+       + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
+}
+
+function debounceLoad() {
+  clearTimeout(debTimer);
+  debTimer = setTimeout(loadData, 400);
+}
+
+function resetFilter() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('filter-dari').value   = toDateStr(firstDay);
+  document.getElementById('filter-sampai').value = toDateStr(today);
+  document.getElementById('filter-metode').value = '';
+  document.getElementById('filter-search').value = '';
+  state.page = 1;
+  loadData();
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────
+async function loadData() {
+  state.page = 1;
+  await fetchPage(1);
+  await loadRekap();
+}
+
+async function fetchPage(page) {
+  const dari    = document.getElementById('filter-dari').value;
+  const sampai  = document.getElementById('filter-sampai').value;
+  const metode  = document.getElementById('filter-metode').value;
+  const search  = document.getElementById('filter-search').value;
+
+  const params = new URLSearchParams({ page, per_page: 20, dari, sampai, metode, search });
+  const tbody  = document.getElementById('tbl-body');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">⏳ Memuat...</td></tr>';
+
+  try {
+    const res  = await fetch('/api/laporan/transaksi?' + params);
+    const data = await res.json();
+    state = { page, total: data.total, total_page: data.total_page };
+    allData = data.data;
+    renderTable(data.data);
+    renderPagination();
+    document.getElementById('tbl-info').textContent = `${data.total.toLocaleString('id-ID')} transaksi`;
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:24px;">⚠️ Gagal memuat data</td></tr>';
+  }
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('tbl-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px;">Tidak ada transaksi ditemukan</td></tr>';
+    return;
+  }
+  const metodeBadge = { cash:'badge-success', transfer:'badge-info', qris:'badge-warning', debit:'badge-info' };
+  tbody.innerHTML = rows.map(tx => `
+    <tr>
+      <td style="font-family:var(--font-mono);font-size:12px;font-weight:700;">${tx.invoice_number}</td>
+      <td style="font-size:12px;">${fmtDate(tx.created_at)}</td>
+      <td>${tx.kasir}</td>
+      <td><span class="badge ${metodeBadge[tx.payment_method]||'badge-info'}">${tx.payment_method}</span></td>
+      <td style="font-family:var(--font-mono);font-weight:700;">${fmt(tx.total)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="showDetail('${tx.id}','${tx.invoice_number}')">
+          Detail
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPagination() {
+  const info = document.getElementById('page-info');
+  const btns = document.getElementById('page-btns');
+  const { page, total, total_page } = state;
+  const from = (page-1)*20+1, to = Math.min(page*20, total);
+  info.textContent = total > 0 ? `${from}–${to} dari ${total.toLocaleString('id-ID')}` : '';
+  if (total_page <= 1) { btns.innerHTML = ''; return; }
+
+  let html = `<button class="kat-pill" onclick="fetchPage(${page-1})" ${page===1?'disabled':''} style="padding:4px 10px;">‹</button>`;
+  for (let i = Math.max(1, page-2); i <= Math.min(total_page, page+2); i++) {
+    html += `<button class="kat-pill ${i===page?'active':''}" onclick="fetchPage(${i})" style="padding:4px 10px;">${i}</button>`;
+  }
+  html += `<button class="kat-pill" onclick="fetchPage(${page+1})" ${page===total_page?'disabled':''} style="padding:4px 10px;">›</button>`;
+  btns.innerHTML = html;
+}
+
+// ── REKAP ─────────────────────────────────────────────────
+async function loadRekap() {
+  const dari   = document.getElementById('filter-dari').value;
+  const sampai = document.getElementById('filter-sampai').value;
+  const params = new URLSearchParams({ dari, sampai });
+
+  try {
+    const res  = await fetch('/api/laporan/rekap?' + params);
+    const data = await res.json();
+
+    document.getElementById('rek-pendapatan').textContent = fmt(data.total_pendapatan);
+    document.getElementById('rek-transaksi').textContent  = data.total_transaksi.toLocaleString('id-ID');
+    const rata = data.total_transaksi > 0 ? data.total_pendapatan / data.total_transaksi : 0;
+    document.getElementById('rek-rata').textContent = fmt(rata);
+
+    // Metode terbanyak
+    const metode = data.by_metode || {};
+    const top = Object.entries(metode).sort((a,b) => b[1]-a[1])[0];
+    document.getElementById('rek-metode').textContent = top ? `${top[0].toUpperCase()} (${fmt(top[1])})` : '—';
+  } catch(e) { console.warn('Rekap error:', e); }
+}
+
+// ── DETAIL TRANSAKSI ──────────────────────────────────────
+async function showDetail(txId, invoice) {
+  document.getElementById('detail-title').textContent = 'Detail — ' + invoice;
+  document.getElementById('detail-body').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">⏳ Memuat item...</div>';
+  document.getElementById('detail-modal').classList.add('open');
+
+  try {
+    const res   = await fetch(`/api/laporan/transaksi/${txId}/items`);
+    const items = await res.json();
+
+    if (!items.length) {
+      document.getElementById('detail-body').innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;">Tidak ada item</p>';
+      return;
+    }
+
+    const total = items.reduce((s, i) => s + parseFloat(i.subtotal || 0), 0);
+    document.getElementById('detail-body').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:8px 4px;color:var(--text-muted);font-weight:600;">Produk</th>
+            <th style="text-align:right;padding:8px 4px;color:var(--text-muted);font-weight:600;">Qty</th>
+            <th style="text-align:right;padding:8px 4px;color:var(--text-muted);font-weight:600;">Harga</th>
+            <th style="text-align:right;padding:8px 4px;color:var(--text-muted);font-weight:600;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(i => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 4px;">${i.product_name}</td>
+            <td style="padding:8px 4px;text-align:right;font-family:var(--font-mono);">${i.quantity}</td>
+            <td style="padding:8px 4px;text-align:right;font-family:var(--font-mono);">${fmt(i.price)}</td>
+            <td style="padding:8px 4px;text-align:right;font-family:var(--font-mono);font-weight:700;">${fmt(i.subtotal)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:10px 4px;font-weight:700;text-align:right;">TOTAL</td>
+            <td style="padding:10px 4px;font-weight:700;font-family:var(--font-mono);text-align:right;color:var(--accent);">${fmt(total)}</td>
+          </tr>
+        </tfoot>
+      </table>`;
+  } catch(e) {
+    document.getElementById('detail-body').innerHTML = '<p style="color:var(--danger);padding:20px;">Gagal memuat detail</p>';
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').classList.remove('open');
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────
+async function exportCSV() {
+  // Ambil semua data tanpa pagination
+  const dari   = document.getElementById('filter-dari').value;
+  const sampai = document.getElementById('filter-sampai').value;
+  const metode = document.getElementById('filter-metode').value;
+  const search = document.getElementById('filter-search').value;
+  const params = new URLSearchParams({ page:1, per_page:9999, dari, sampai, metode, search });
+
+  try {
+    const res  = await fetch('/api/laporan/transaksi?' + params);
+    const data = await res.json();
+    const rows = data.data;
+
+    const header = ['Invoice','Tanggal','Kasir','Metode','Total'];
+    const csv = [
+      header.join(','),
+      ...rows.map(r => [
+        r.invoice_number,
+        fmtDate(r.created_at),
+        r.kasir,
+        r.payment_method,
+        r.total
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `laporan-${dari}-${sampai}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Gagal export CSV: ' + e.message);
+  }
+}
+</script>
+{% endblock %}

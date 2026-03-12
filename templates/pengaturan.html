@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan — POS SUMBA{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+  <div class="page-title">Pengaturan Toko</div>
+  <div class="page-sub">Konfigurasi informasi toko & struk</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+  <!-- INFORMASI TOKO -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      </svg>
+      Informasi Toko
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="form-label">Nama Toko</label>
+        <input type="text" id="s-store_name" class="form-control" value="{{ settings.get('store_name','') }}" placeholder="Nama toko...">
+      </div>
+      <div>
+        <label class="form-label">Alamat</label>
+        <textarea id="s-store_address" class="form-control" rows="2" placeholder="Alamat lengkap...">{{ settings.get('store_address','') }}</textarea>
+      </div>
+      <div>
+        <label class="form-label">Nomor Telepon</label>
+        <input type="text" id="s-store_phone" class="form-control" value="{{ settings.get('store_phone','') }}" placeholder="08xx-xxxx-xxxx">
+      </div>
+      <div>
+        <label class="form-label">Email Toko</label>
+        <input type="email" id="s-store_email" class="form-control" value="{{ settings.get('store_email','') }}" placeholder="toko@email.com">
+      </div>
+    </div>
+  </div>
+
+  <!-- PENGATURAN STRUK -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Pengaturan Struk
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="form-label">Pesan Footer Struk</label>
+        <input type="text" id="s-receipt_footer" class="form-control" value="{{ settings.get('receipt_footer','') }}" placeholder="Terima kasih telah berbelanja!">
+      </div>
+      <div>
+        <label class="form-label">Ukuran Kertas Printer</label>
+        <select id="s-printer_width" class="form-control">
+          <option value="58" {% if settings.get('printer_width','58')=='58' %}selected{% endif %}>58mm</option>
+          <option value="80" {% if settings.get('printer_width','58')=='80' %}selected{% endif %}>80mm</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Tampilkan No. Telepon di Struk</label>
+        <select id="s-struk_show_phone" class="form-control">
+          <option value="1" {% if settings.get('struk_show_phone','1')=='1' %}selected{% endif %}>Ya</option>
+          <option value="0" {% if settings.get('struk_show_phone','1')=='0' %}selected{% endif %}>Tidak</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- PENGATURAN TRANSAKSI -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      Transaksi & Pajak
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="form-label">Mata Uang</label>
+        <select id="s-currency" class="form-control">
+          <option value="IDR" {% if settings.get('currency','IDR')=='IDR' %}selected{% endif %}>IDR — Rupiah</option>
+          <option value="USD" {% if settings.get('currency','IDR')=='USD' %}selected{% endif %}>USD — Dollar</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Pajak / PPN (%)</label>
+        <input type="number" id="s-tax_percentage" class="form-control" value="{{ settings.get('tax_percentage','0') }}" min="0" max="100" placeholder="0">
+        <span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">Set 0 jika tidak pakai pajak</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW STRUK -->
+  <div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+      Preview Struk
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:16px;font-family:'Courier New',monospace;font-size:11px;color:#333;line-height:1.6;max-width:220px;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,0.15);" id="struk-preview">
+    </div>
+  </div>
+
+</div>
+
+<!-- TOMBOL SIMPAN -->
+<div style="display:flex;justify-content:flex-end;margin-top:20px;gap:10px;">
+  <button class="btn btn-ghost" onclick="loadSettings()">Reset</button>
+  <button class="btn btn-primary" id="btn-simpan" onclick="saveSettings()">
+    <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Simpan Pengaturan
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── PREVIEW STRUK ─────────────────────────────────────────
+function updatePreview() {
+  const name    = document.getElementById('s-store_name')?.value    || 'Nama Toko';
+  const address = document.getElementById('s-store_address')?.value || 'Alamat Toko';
+  const phone   = document.getElementById('s-store_phone')?.value   || '';
+  const footer  = document.getElementById('s-receipt_footer')?.value || 'Terima kasih!';
+  const showPhone = document.getElementById('s-struk_show_phone')?.value === '1';
+
+  const line  = '-'.repeat(32);
+  const now   = new Date().toLocaleString('id-ID', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById('struk-preview').innerHTML = `
+    <div style="text-align:center;font-weight:bold;font-size:13px;">${name}</div>
+    <div style="text-align:center;">${address}</div>
+    ${showPhone && phone ? `<div style="text-align:center;">Tel: ${phone}</div>` : ''}
+    <div>${line}</div>
+    <div>Invoice : INV-20260312-00001</div>
+    <div>Tanggal : ${now}</div>
+    <div>Kasir   : Admin</div>
+    <div>${line}</div>
+    <div>Indomie Goreng</div>
+    <div style="display:flex;justify-content:space-between;"><span>  2 x Rp 3.500</span><span>Rp 7.000</span></div>
+    <div>Aqua 600ml</div>
+    <div style="display:flex;justify-content:space-between;"><span>  1 x Rp 4.000</span><span>Rp 4.000</span></div>
+    <div>${line}</div>
+    <div style="display:flex;justify-content:space-between;font-weight:bold;"><span>TOTAL</span><span>Rp 11.000</span></div>
+    <div style="display:flex;justify-content:space-between;"><span>Bayar</span><span>Rp 15.000</span></div>
+    <div style="display:flex;justify-content:space-between;"><span>Kembalian</span><span>Rp 4.000</span></div>
+    <div>${line}</div>
+    <div style="text-align:center;">${footer}</div>
+  `;
+}
+
+// Update preview real-time saat input berubah
+['s-store_name','s-store_address','s-store_phone','s-receipt_footer','s-struk_show_phone'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updatePreview);
+  if (el && el.tagName === 'SELECT') el.addEventListener('change', updatePreview);
+});
+
+document.getElementById('s-struk_show_phone').addEventListener('change', updatePreview);
+
+// ── SIMPAN ────────────────────────────────────────────────
+async function saveSettings() {
+  const btn = document.getElementById('btn-simpan');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
+  const keys = ['store_name','store_address','store_phone','store_email',
+                 'receipt_footer','printer_width','struk_show_phone',
+                 'currency','tax_percentage'];
+  const data = {};
+  keys.forEach(k => {
+    const el = document.getElementById('s-' + k);
+    if (el) data[k] = el.value;
+  });
+
+  try {
+    const res  = await fetch('/api/pengaturan', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+    window.PosSync?.showToast('✅ Pengaturan berhasil disimpan', 'success');
+  } catch(e) {
+    window.PosSync?.showToast('❌ Gagal simpan: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Simpan Pengaturan';
+  }
+}
+
+function loadSettings() {
+  window.location.reload();
+}
+
+// ── INIT ─────────────────────────────────────────────────
+updatePreview();
+</script>
+{% endblock %}
