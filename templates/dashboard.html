@@ -19,8 +19,8 @@
     <div class="stat-icon">
       <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     </div>
-    <div class="stat-label">Pendapatan Hari Ini</div>
-    <div class="stat-value" id="stat-pendapatan">Rp {{ "{:,.0f}".format(pendapatan_hari_ini) }}</div>
+    <div class="stat-label">Pendapatan {{ bulan_label }}</div>
+    <div class="stat-value" id="stat-pendapatan">Rp {{ "{:,.0f}".format(pendapatan_bulan_ini) }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-icon">
@@ -174,7 +174,10 @@ async function refreshDashboard() {
     const data = await res.json();
 
     // Update stat cards dengan animasi
-    animateValue(document.getElementById('stat-pendapatan'), fmtRp(data.pendapatan_hari_ini));
+    animateValue(document.getElementById('stat-pendapatan'), fmtRp(data.pendapatan_bulan_ini));
+    // Update label bulan jika berganti bulan
+    const labelEl = document.querySelector('[id="stat-pendapatan"]')?.closest('.stat-card')?.querySelector('.stat-label');
+    if (labelEl && data.bulan_label) labelEl.textContent = 'Pendapatan ' + data.bulan_label;
     animateValue(document.getElementById('stat-transaksi'),  String(data.total_transaksi));
     animateValue(document.getElementById('stat-produk'),     String(data.total_produk));
     animateValue(document.getElementById('stat-pelanggan'),  String(data.total_pelanggan));
