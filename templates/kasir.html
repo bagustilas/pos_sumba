@@ -385,6 +385,7 @@
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -632,11 +633,63 @@
 
 <script>
 // ── STATE ──────────────────────────────────────────────
+// ── SUPABASE REALTIME (broadcast cart ke shop) ────────
+const SB_URL = "{{ supabase_url }}";
+const SB_KEY = "{{ supabase_key }}";
+const CART_CHANNEL = "pos-cart";
+let realtimeChannel = null;
+
+function initRealtime() {
+  // Gunakan WebSocket Supabase Realtime langsung tanpa library
+  const wsUrl = SB_URL.replace("https://", "wss://").replace("http://", "ws://") + "/realtime/v1/websocket?apikey=" + SB_KEY + "&vsn=1.0.0";
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    // Join channel
+    ws.send(JSON.stringify({
+      topic: "realtime:" + CART_CHANNEL,
+      event: "phx_join",
+      payload: { config: { broadcast: { self: false } } },
+      ref: "1"
+    }));
+    realtimeChannel = ws;
+  };
+
+  ws.onclose = () => {
+    realtimeChannel = null;
+    // Reconnect setelah 3 detik
+    setTimeout(initRealtime, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  // Heartbeat setiap 30 detik
+  setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb" }));
+    }
+  }, 30000);
+}
+
+function broadcastCart() {
+  if (!realtimeChannel || realtimeChannel.readyState !== WebSocket.OPEN) return;
+  const items = Object.values(cart).map(i => ({
+    id: i.id, name: i.name, price: i.price,
+    qty: i.qty, stock: i.stock, category: i.category || ""
+  }));
+  realtimeChannel.send(JSON.stringify({
+    topic: "realtime:" + CART_CHANNEL,
+    event: "broadcast",
+    payload: { event: "cart_update", payload: { items } },
+    ref: "bc"
+  }));
+}
+
 let cart       = {};   // {id: {id, name, price, qty, stock, unit}}
 let cartTotal  = 0;
 let cartFinal  = 0;   // total setelah diskon & pajak
 let activeShiftId = null;
-const TAX_PCT  = {{ settings.get('tax_percentage','0')|float }};  // dari settings toko
+const TAX_PCT  = parseFloat("{{ settings.get('tax_percentage','0') }}") || 0;  // dari settings toko
 let payMethod  = 'cash';
 let gridState  = { page: 1, search: '', category_id: '', total: 0, total_page: 1 };
 let searchTimer = null;
@@ -823,6 +876,7 @@ function addToCart(el) {
     };
   }
   renderCart();
+  broadcastCart();
   // Update badge di grid tanpa reload
   el.classList.add('in-cart');
   const badge = el.querySelector('.pc-qty-badge');
@@ -838,6 +892,7 @@ function changeQty(id, delta) {
     cart[id].qty = cart[id].stock;
   }
   renderCart();
+  broadcastCart();
   // Refresh badge di grid
   const card = document.querySelector(`.produk-card[data-id="${id}"]`);
   if (card) {
@@ -867,6 +922,7 @@ function removeItem(id) {
 function clearCart() {
   cart = {};
   renderCart();
+  broadcastCart();
   document.querySelectorAll('.produk-card.in-cart').forEach(c => {
     c.classList.remove('in-cart');
     const b = c.querySelector('.pc-qty-badge');
@@ -1413,6 +1469,7 @@ function escHtml(s) {
 
 // ── INIT ───────────────────────────────────────────────
 loadProduk();
+initRealtime();
 </script>
 <script src="{{ url_for('static', filename='js/printer.js') }}"></script>
 {% endblock %}

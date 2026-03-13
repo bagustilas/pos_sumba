@@ -21,7 +21,8 @@ def index():
     # Ambil settings toko untuk struk
     raw_settings = sb.table("settings").select("key,value").execute().data or []
     settings = {s["key"]: s["value"] for s in raw_settings}
-    return render_template("kasir.html", kategori=kategori, settings=settings)
+    return render_template("kasir.html", kategori=kategori, settings=settings,
+                           supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
 
 @kasir_bp.route("/api/kasir/produk")
 @login_required

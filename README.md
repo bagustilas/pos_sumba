@@ -28,6 +28,7 @@ pos_web_requests/
 │   ├── voucher.py                # Voucher & promo             ← Fase 3
 │   ├── retur.py                  # Retur transaksi             ← Fase 3
 │   ├── backup.py                 # Backup & export data        ← Fase 3
+│   ├── shop.py                   # Halaman toko pelanggan      ← Fase 4
 │   └── sync.py                   # Offline sync + service worker
 ├── utils/
 │   ├── supabase_client.py        # Custom query builder REST API
@@ -45,6 +46,7 @@ pos_web_requests/
 │   ├── voucher.html              # Kelola voucher              ← Fase 3
 │   ├── retur.html                # Proses retur                ← Fase 3
 │   ├── backup.html               # Export & backup             ← Fase 3
+│   ├── shop.html                 # Toko pelanggan (publik)     ← Fase 4
 │   ├── pengguna.html
 │   └── pengaturan.html
 └── static/
@@ -132,6 +134,7 @@ python app.py
 | `/pengguna` | Manajemen user kasir | Admin |
 | `/pengaturan` | Pengaturan toko | Admin |
 | `/backup` | Export & backup data | Admin |
+| `/shop` | **Toko pelanggan** — video promo + keranjang realtime | **Publik** |
 
 ### API Utama
 
@@ -148,10 +151,30 @@ python app.py
 | `POST /api/shift/buka` | Buka shift dengan modal kas |
 | `POST /api/shift/tutup` | Tutup shift + hitung selisih |
 | `POST /api/sync` | Terima transaksi offline |
+| `GET /api/shop/produk` | List produk untuk halaman shop (publik) |
 
 ---
 
-## ✅ Rekap Fitur (3 Fase)
+## 📡 Realtime Kasir → Shop
+
+Keranjang kasir disinkronkan ke layar pelanggan (`/shop`) secara real-time tanpa polling menggunakan **Supabase Realtime WebSocket**.
+
+```
+kasir.html  →  broadcast "cart_update"  →  channel "pos-cart"
+                                                    ↓
+                                             shop.html subscribe
+                                                    ↓
+                                          renderCart() otomatis
+```
+
+- Kasir tambah / ubah / hapus item → shop update instan
+- Transaksi selesai / kasir clear → keranjang shop otomatis kosong
+- Koneksi putus → reconnect otomatis setiap 3 detik
+- Indikator dot: 🟢 terhubung / 🟡 menghubungkan
+
+---
+
+## ✅ Rekap Fitur (4 Fase)
 
 ### Fase 1 — Inti
 | # | Fitur |
@@ -184,6 +207,16 @@ python app.py
 | 18 | **Voucher & Promo** — kode unik, % atau Rp, batas pakai, masa berlaku |
 | 19 | **Retur Transaksi** — cari by invoice, pilih item, stok kembali otomatis |
 | 20 | **Backup & Export** — transaksi CSV/JSON, produk CSV, pelanggan CSV |
+
+### Fase 4 — Customer Display
+| # | Fitur |
+|---|-------|
+| 21 | **Halaman Toko Publik** (`/shop`) — tampilan layar pelanggan tanpa login |
+| 22 | **Video Promo** — 3 tab (Promo 1, Promo 2, Produk Unggulan), support YouTube embed |
+| 23 | **Keranjang Realtime** — sinkron otomatis dari kasir via Supabase Realtime WebSocket |
+| 24 | **Total Bayar Live** — subtotal, pajak, voucher, dan total update instan |
+| 25 | **Running Text** — ticker info promo berjalan di bagian bawah layar |
+| 26 | **Indikator Koneksi** — dot hijau/kuning menunjukkan status link kasir ↔ shop |
 
 ---
 

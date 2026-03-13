@@ -19,6 +19,7 @@ from routes.pelanggan import pelanggan_bp
 from routes.voucher import voucher_bp
 from routes.retur import retur_bp
 from routes.backup import backup_bp
+from routes.shop import shop_bp
 import os
 from dotenv import load_dotenv
 
@@ -42,6 +43,7 @@ app.register_blueprint(pelanggan_bp)
 app.register_blueprint(voucher_bp)
 app.register_blueprint(retur_bp)
 app.register_blueprint(backup_bp)
+app.register_blueprint(shop_bp)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

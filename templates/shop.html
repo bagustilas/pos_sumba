@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ settings.get('store_name', 'POS SUMBA') }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1c1c1e; --surface: #242426; --surface2: #2c2c2e;
+      --border: rgba(255,255,255,0.08);
+      --accent: #1F69A4; --accent2: #3a8fd4;
+      --text: #f2f2f2; --muted: #888;
+      --success: #30d158; --danger: #ff453a; --gold: #ffd60a;
+      --topbar-h: 50px; --ticker-h: 42px;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column; font-size: 13px;
+    }
+    .topbar {
+      height: var(--topbar-h); background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 18px; flex-shrink: 0;
+    }
+    .logo { font-size: 16px; font-weight: 800; }
+    .logo em { color: var(--accent2); font-style: normal; }
+    .topbar-info { font-size: 11px; color: var(--muted); }
+    .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+    /* VIDEO PANEL 80% */
+    .panel-video {
+      width: 80%; display: flex; flex-direction: column;
+      background: #000; border-right: 1px solid var(--border); overflow: hidden;
+    }
+    .vtabs {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .vtab {
+      padding: 10px 18px; font-size: 12px; font-weight: 600;
+      color: var(--muted); cursor: pointer;
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .vtab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+    .vtab:hover:not(.active) { color: var(--text); }
+    .vwrap { flex: 1; position: relative; overflow: hidden; }
+    .vframe { display: none; position: absolute; inset: 0; }
+    .vframe.active { display: flex; }
+    .vframe iframe { width: 100%; height: 100%; border: none; }
+    .vplaceholder {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(31,105,164,.2) 0%, transparent 70%), #080808;
+    }
+    .picon {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; cursor: pointer; transition: transform .2s, background .2s;
+    }
+    .picon:hover { transform: scale(1.08); background: var(--accent2); }
+    .vplaceholder p { font-size: 15px; font-weight: 700; color: var(--text); }
+    .vplaceholder small { font-size: 11px; color: var(--muted); }
+    .vinfo {
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; gap: 24px; padding: 8px 18px; flex-shrink: 0;
+    }
+    .vinfo-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+    .vinfo-item b { color: var(--text); font-weight: 600; }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
+
+    /* CART PANEL 20% */
+    .panel-cart {
+      width: 20%; min-width: 220px; background: var(--surface);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .cart-hd {
+      padding: 12px 14px 10px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .cart-hd-title { font-size: 13px; font-weight: 700; }
+    .cart-badge {
+      background: var(--accent); color: #fff; border-radius: 999px;
+      padding: 1px 8px; font-size: 10px; font-weight: 700; display: none;
+    }
+    .cart-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px;
+      min-height: 0; /* KRITIS: tanpa ini flex-child tidak bisa scroll, menyedot semua ruang */
+    }
+    .cart-list::-webkit-scrollbar { width: 3px; }
+    .cart-list::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+    .cart-sum {
+      border-top: 2px solid var(--border);
+      padding: 10px 12px;
+      flex-shrink: 0;
+      background: var(--surface);
+      position: relative;
+      z-index: 1;
+    }
+    .cart-empty {
+      height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px; color: var(--muted); font-size: 11px; text-align: center;
+    }
+    .cart-empty-ico { font-size: 28px; opacity: .25; margin-bottom: 4px; }
+    .ci {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      animation: slideIn .15s ease;
+    }
+    @keyframes slideIn { from { opacity:0; transform:translateX(6px); } to { opacity:1; transform:translateX(0); } }
+    .ci-ico {
+      width: 30px; height: 30px; background: var(--surface2);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .ci-info { flex: 1; min-width: 0; }
+    .ci-name { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+    .ci-price { font-size: 10px; color: var(--accent2); font-weight: 700; }
+    .ci-ctrl { display: flex; align-items: center; background: var(--surface2); border-radius: 5px; overflow: hidden; flex-shrink: 0; }
+    .cib {
+      width: 20px; height: 20px; background: none; border: none; color: var(--text);
+      cursor: pointer; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; transition: background .1s;
+    }
+    .cib:hover { background: rgba(255,255,255,.08); }
+    .ciq { min-width: 16px; text-align: center; font-size: 10px; font-weight: 700; }
+    .total-box {
+      background: linear-gradient(135deg, rgba(31,105,164,0.18) 0%, rgba(31,105,164,0.07) 100%);
+      border: 1px solid rgba(31,105,164,0.4);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .total-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .total-amount { font-size: 20px; font-weight: 800; color: var(--accent2); letter-spacing: -0.5px; }
+    .voucher-row { display: flex; gap: 5px; margin-bottom: 8px; }
+    .vinput {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 8px; color: var(--text);
+      font-size: 10px; outline: none; text-transform: uppercase;
+      font-family: inherit; transition: border-color .2s;
+    }
+    .vinput:focus { border-color: var(--accent); }
+    .vbtn {
+      padding: 5px 9px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 10px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .vbtn:hover { background: var(--accent); border-color: var(--accent); }
+    .vok {
+      display: none; align-items: center; justify-content: space-between;
+      background: rgba(48,209,88,.08); border: 1px solid rgba(48,209,88,.2);
+      border-radius: 5px; padding: 4px 8px; margin-bottom: 6px;
+      font-size: 10px; color: var(--success);
+    }
+    .vok button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 11px; }
+    .srow { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding: 2px 0; }
+    .srow.total { display: none; }
+    .btn-co {
+      width: 100%; padding: 10px; background: var(--accent); border: none;
+      border-radius: 7px; color: #fff; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: background .2s; margin-top: 8px;
+    }
+    .btn-co:hover { background: var(--accent2); }
+
+    /* TICKER */
+    .ticker {
+      height: var(--ticker-h); background: var(--accent);
+      display: flex; align-items: center; overflow: hidden; flex-shrink: 0;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .ticker-label {
+      background: rgba(0,0,0,.2); height: 100%;
+      display: flex; align-items: center; padding: 0 16px;
+      font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+      text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+      border-right: 1px solid rgba(255,255,255,.15);
+    }
+    .ticker-track { flex: 1; overflow: hidden; }
+    .ticker-inner { display: flex; white-space: nowrap; animation: scroll 30s linear infinite; }
+    @keyframes scroll { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+    .titem { display: inline-flex; align-items: center; gap: 6px; padding: 0 28px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.92); }
+    .tsep { color: rgba(255,255,255,.3); }
+
+    /* MODAL */
+    .overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      width: 400px; max-width: calc(100vw - 24px); max-height: 88vh; overflow-y: auto;
+      transform: scale(.96) translateY(8px); transition: transform .25s cubic-bezier(.22,1,.36,1);
+    }
+    .overlay.open .modal { transform: scale(1) translateY(0); }
+    .mhd { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .mhd-title { font-size: 15px; font-weight: 700; }
+    .mclose {
+      width: 26px; height: 26px; background: var(--surface2); border: none; border-radius: 6px;
+      color: var(--muted); cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; justify-content: center; transition: all .15s;
+    }
+    .mclose:hover { background: rgba(255,69,58,.15); color: var(--danger); }
+    .mbody { padding: 16px 18px; }
+    .mfoot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+    .obox { background: var(--surface2); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; max-height: 150px; overflow-y: auto; }
+    .oitem { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+    .oitem:last-child { border: none; }
+    .oitem span:first-child { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+    .oitem span:last-child { font-weight: 700; flex-shrink: 0; }
+    .ototal { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .ototal strong { font-size: 12px; }
+    .oamt { font-size: 18px; font-weight: 800; color: var(--accent2); }
+    .flabel { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
+    .finput { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 11px; color: var(--text); font-size: 12px; outline: none; font-family: inherit; transition: border-color .2s; }
+    .finput:focus { border-color: var(--accent); }
+    .fgroup { margin-bottom: 12px; }
+    .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 12px; }
+    .ppill { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 6px; background: var(--surface2); border: 2px solid transparent; border-radius: 7px; cursor: pointer; font-size: 11px; font-weight: 600; font-family: inherit; color: var(--text); transition: all .15s; }
+    .ppill:hover { border-color: rgba(31,105,164,.4); }
+    .ppill.active { border-color: var(--accent); background: rgba(31,105,164,.1); color: var(--accent2); }
+    .qcash { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+    .qcbtn { padding: 3px 9px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+    .qcbtn:hover { border-color: var(--accent); color: var(--accent2); }
+    .kbox { background: rgba(48,209,88,.07); border: 1px solid rgba(48,209,88,.2); border-radius: 7px; padding: 8px 12px; display: none; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .kbox.kurang { background: rgba(255,69,58,.07); border-color: rgba(255,69,58,.2); }
+    .klabel { font-size: 10px; font-weight: 600; color: var(--muted); }
+    .kval { font-size: 15px; font-weight: 800; color: var(--success); }
+    .kval.kurang { color: var(--danger); }
+    .success-screen { display: none; text-align: center; padding: 20px 18px; }
+    .sico { width: 56px; height: 56px; border-radius: 50%; background: rgba(48,209,88,.1); border: 2px solid rgba(48,209,88,.35); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 10px; animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes pop { from { transform:scale(0); } to { transform:scale(1); } }
+    .stitle { font-size: 17px; font-weight: 800; margin-bottom: 3px; }
+    .ssub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+    .ibox { background: var(--surface2); border-radius: 8px; padding: 12px; text-align: left; margin-bottom: 14px; }
+    .irow { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+    .irow span { color: var(--muted); }
+    .irow strong { font-weight: 700; }
+    .btn { padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; transition: all .15s; }
+    .btn:hover { background: rgba(255,255,255,.06); }
+    .btn-p { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-p:hover { background: var(--accent2); border-color: var(--accent2); }
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(50px); background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 18px; font-size: 12px; font-weight: 600; z-index: 999; transition: transform .25s cubic-bezier(.22,1,.36,1); pointer-events: none; white-space: nowrap; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">{{ settings.get('store_name','POS SUMBA') }}<em>.</em></div>
+  <div class="topbar-info">
+    {{ settings.get('store_address','Sumba, NTT') }}{% if settings.get('store_phone') %} &nbsp;·&nbsp; {{ settings.get('store_phone') }}{% endif %}
+  </div>
+</header>
+
+<div class="body">
+
+  <!-- VIDEO PROMO 80% -->
+  <div class="panel-video">
+    <div class="vtabs">
+      <div class="vtab active" onclick="switchTab(0,this)">📺 Promo 1</div>
+      <div class="vtab" onclick="switchTab(1,this)">🎬 Promo 2</div>
+      <div class="vtab" onclick="switchTab(2,this)">⭐ Produk Unggulan</div>
+    </div>
+    <div class="vwrap">
+      <div class="vframe active" id="vf0">
+        <div class="vplaceholder"><div class="picon" onclick="playVideo(0)">▶</div><p>Video Promo 1</p><small>Klik untuk memutar</small></div>
+      </div>
+      <div class="vframe" id="vf1">
+        <div class="vplaceholder"><div class="picon" onclick="playVideo(1)">▶</div><p>Video Promo 2</p><small>Klik untuk memutar</small></div>
+      </div>
+      <div class="vframe" id="vf2">
+        <div class="vplaceholder"><div class="picon" onclick="playVideo(2)">▶</div><p>Produk Unggulan</p><small>Klik untuk memutar</small></div>
+      </div>
+    </div>
+    <div class="vinfo">
+      <div class="vinfo-item"><div class="dot"></div><span>Member dapat <b>poin</b> setiap belanja</span></div>
+      <div class="vinfo-item"><div class="dot" style="background:var(--gold);"></div><span>Diskon s/d <b>20%</b> dengan voucher</span></div>
+      <div class="vinfo-item"><div class="dot" style="background:var(--success);"></div><span>Bayar <b>Tunai · QRIS · Transfer</b></span></div>
+    </div>
+  </div>
+
+  <!-- KERANJANG 20% -->
+  <div class="panel-cart">
+    <div class="cart-hd">
+      <span class="cart-hd-title">🛒 Keranjang</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span id="rt-dot"
+          style="width:7px;height:7px;border-radius:50%;background:#f9c74f;display:inline-block;flex-shrink:0;transition:background .3s;"
+          title="Menghubungkan..."></span>
+        <span class="cart-badge" id="cart-badge">0</span>
+      </div>
+    </div>
+    <div class="cart-list" id="cart-list">
+      <div class="cart-empty">
+        <div class="cart-empty-ico">🛒</div>
+        <div>Keranjang kosong</div>
+        <div style="margin-top:3px;color:#666;font-size:10px;">Produk ditambahkan<br>oleh kasir</div>
+      </div>
+    </div>
+    <div class="cart-sum" id="cart-sum">
+      <div class="voucher-row">
+        <input class="vinput" id="vcode" placeholder="KODE VOUCHER"
+               oninput="this.value=this.value.toUpperCase()"
+               onkeydown="if(event.key==='Enter')applyVoucher()">
+        <button class="vbtn" onclick="applyVoucher()">Pakai</button>
+      </div>
+      <div class="vok" id="vok">
+        <span id="vlabel">-</span>
+        <button onclick="clearVoucher()">✕</button>
+      </div>
+      <div class="srow"><span>Subtotal</span><span id="ssub">Rp 0</span></div>
+      <div class="srow" id="sdisc-row" style="display:none;color:var(--success);"><span>Voucher</span><span id="sdisc">-Rp 0</span></div>
+      <div class="srow" id="stax-row" style="display:none;"><span>Pajak {{ settings.get('tax_percentage','0') }}%</span><span id="stax">Rp 0</span></div>
+      <div class="total-box">
+        <span class="total-label">Total Bayar</span>
+        <span class="total-amount" id="stotal">Rp 0</span>
+      </div>
+      <button class="btn-co" onclick="openCheckout()">✓ Checkout</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUNNING TEXT -->
+<div class="ticker">
+  <div class="ticker-label">📢 INFO</div>
+  <div class="ticker-track">
+    <div class="ticker-inner" id="ticker-inner"></div>
+  </div>
+</div>
+
+<!-- MODAL CHECKOUT -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="mhd">
+      <div class="mhd-title" id="mtitle">Konfirmasi Pembayaran</div>
+      <button class="mclose" onclick="closeCheckout()">✕</button>
+    </div>
+    <div id="mform">
+      <div class="mbody">
+        <div class="obox" id="oitems"></div>
+        <div class="ototal"><strong>Total Bayar</strong><span class="oamt" id="ototal">Rp 0</span></div>
+        <div style="height:12px;"></div>
+        <div class="fgroup">
+          <label class="flabel">Nama (opsional)</label>
+          <input type="text" class="finput" id="coname" placeholder="Masukkan nama...">
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Metode Pembayaran</label>
+          <div class="pgrid">
+            <div class="ppill active" data-val="cash" onclick="setPayMethod(this)"><span>💵</span>Tunai</div>
+            <div class="ppill" data-val="qris" onclick="setPayMethod(this)"><span>📱</span>QRIS</div>
+            <div class="ppill" data-val="transfer" onclick="setPayMethod(this)"><span>🏦</span>Transfer</div>
+            <div class="ppill" data-val="debit" onclick="setPayMethod(this)"><span>💳</span>Debit</div>
+          </div>
+        </div>
+        <div class="fgroup" id="cash-sec">
+          <label class="flabel">Jumlah Uang</label>
+          <input type="number" class="finput" id="copaid" placeholder="0" oninput="updateKembalian()" style="font-size:15px;font-weight:700;">
+          <div class="qcash">
+            <button class="qcbtn" onclick="setCash(10000)">10rb</button>
+            <button class="qcbtn" onclick="setCash(20000)">20rb</button>
+            <button class="qcbtn" onclick="setCash(50000)">50rb</button>
+            <button class="qcbtn" onclick="setCash(100000)">100rb</button>
+            <button class="qcbtn" onclick="setCash(200000)">200rb</button>
+            <button class="qcbtn" onclick="setExact()" style="color:var(--accent2);">Pas</button>
+          </div>
+          <div class="kbox" id="kbox">
+            <span class="klabel">Kembalian</span>
+            <span class="kval" id="kval">Rp 0</span>
+          </div>
+        </div>
+      </div>
+      <div class="mfoot">
+        <button class="btn" onclick="closeCheckout()">Batal</button>
+        <button class="btn btn-p" id="btn-confirm" onclick="confirmOrder()">Konfirmasi</button>
+      </div>
+    </div>
+    <div class="success-screen" id="msuccess">
+      <div class="sico">✓</div>
+      <div class="stitle">Pesanan Berhasil!</div>
+      <div class="ssub">Tunjukkan nomor invoice ke kasir.</div>
+      <div class="ibox" id="ibox"></div>
+      <button class="btn btn-p" style="width:100%;" onclick="resetAll()">Belanja Lagi 🛒</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TAX_PCT = parseFloat("{{ settings.get('tax_percentage','0') }}") || 0;
+const STORE_NAME = "{{ settings.get('store_name','POS SUMBA')|e }}";
+const STORE_FOOTER = "{{ settings.get('receipt_footer','Terima kasih sudah berbelanja!')|e }}";
+const SB_URL = "{{ supabase_url }}";
+const SB_KEY = "{{ supabase_key }}";
+
+const VIDEO_URLS = ["","",""];
+// Isi dengan URL embed YouTube:
+VIDEO_URLS[0] = "https://www.youtube.com/embed/iUtnZpzkbG8";
+VIDEO_URLS[1] = "https://www.youtube.com/embed/EEv5TgHVwfY";
+// VIDEO_URLS[2] = "https://www.youtube.com/embed/VIDEO_ID";
+
+let activeTab = 0;
+
+function switchTab(idx, el) {
+  const prev = document.getElementById("vf" + activeTab);
+  const iframe = prev.querySelector("iframe");
+  if (iframe) { const s = iframe.src; iframe.src = ""; iframe.src = s; }
+  document.querySelectorAll(".vtab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".vframe").forEach(f => f.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("vf" + idx).classList.add("active");
+  activeTab = idx;
+}
+
+function playVideo(idx) {
+  const url = VIDEO_URLS[idx];
+  if (!url) { showToast("URL video belum diisi di shop.html", "warning"); return; }
+  document.getElementById("vf" + idx).innerHTML =
+    '<iframe src="' + url + '?autoplay=1" allowfullscreen allow="autoplay; fullscreen"></iframe>';
+}
+
+// Ticker
+const TICKERS = [
+  "Promo hari ini — diskon spesial pilihan",
+  "Daftar member gratis, kumpulkan poin setiap belanja",
+  "Pembayaran: Tunai · QRIS · Transfer · Debit",
+  "Punya kode voucher? Masukkan di keranjang belanja",
+  "Lebih dari 30.000 produk tersedia",
+  "Tukar poin loyalty dengan diskon belanja berikutnya",
+  "Selamat berbelanja di " + STORE_NAME,
+];
+(function(){
+  const inner = document.getElementById("ticker-inner");
+  const all = [...TICKERS, ...TICKERS];
+  inner.innerHTML = all.map(t => '<span class="titem">' + t + '<span class="tsep"> · </span></span>').join("");
+})();
+
+// Cart state
+let cart = {}, vDisc = 0, vData = null, payMethod = "cash";
+const EMOJI = {"Makanan":"🍱","Minuman":"🥤","Snack":"🍿","Biskuit":"🍪","Detergen":"🧴","Kosmetik":"💄","Alat Rumah Tangga":"🏠","Makanan Kaleng":"🥫","Mie":"🍜","Beras":"🌾","Kopi":"☕","Teh":"🍵","Sabun":"🧼","Rokok":"🚬","Obat":"💊"};
+const emo = cat => EMOJI[cat] || "📦";
+const fmt = n => "Rp " + Number(n).toLocaleString("id-ID");
+const getTotal = () => { const s = Object.values(cart).reduce((a,i)=>a+i.price*i.qty,0); const d=s-vDisc; return d+d*TAX_PCT/100; };
+
+function addItem(p) {
+  if (!cart[p.id]) cart[p.id] = {...p, qty:0};
+  if (cart[p.id].qty >= p.stock) { showToast("Stok tidak cukup","warning"); return; }
+  cart[p.id].qty++;
+  renderCart();
+  showToast("Ditambahkan: " + p.name.split(" ").slice(0,3).join(" "),"success");
+}
+
+function removeItem(id) {
+  if (!cart[id]) return;
+  cart[id].qty--;
+  if (cart[id].qty <= 0) delete cart[id];
+  renderCart();
+}
+
+function renderCart() {
+  const items = Object.values(cart);
+  const listEl = document.getElementById("cart-list");
+  const sumEl  = document.getElementById("cart-sum");
+  const badge  = document.getElementById("cart-badge");
+  const total  = items.reduce((s,i)=>s+i.qty,0);
+
+  badge.textContent = total;
+  badge.style.display = total > 0 ? "" : "none";
+
+  if (!items.length) {
+    listEl.innerHTML = '<div class="cart-empty"><div class="cart-empty-ico">🛒</div><div>Keranjang kosong</div><div style="margin-top:3px;color:#666;font-size:10px;">Produk ditambahkan<br>oleh kasir</div></div>';
+    sumEl.style.display = "none";
+    return;
+  }
+
+  listEl.innerHTML = items.map(i =>
+    '<div class="ci"><div class="ci-ico">' + emo(i.category||"") + '</div><div class="ci-info"><div class="ci-name">' + i.name + '</div><div class="ci-price">' + fmt(i.price*i.qty) + '</div></div><div class="ci-ctrl"><span class="ciq">' + i.qty + '</span></div></div>'
+  ).join("");
+
+  const sub  = items.reduce((s,i) => s + (parseFloat(i.price)||0) * i.qty, 0);
+  const disc = Math.min(vDisc, sub);
+  const tax  = (sub - disc) * TAX_PCT / 100;
+  const tot  = sub - disc + tax;
+
+  document.getElementById("ssub").textContent  = fmt(sub);
+  document.getElementById("sdisc-row").style.display = disc > 0 ? "" : "none";
+  document.getElementById("sdisc").textContent = "-" + fmt(disc);
+  document.getElementById("stax-row").style.display  = TAX_PCT > 0 ? "" : "none";
+  document.getElementById("stax").textContent  = fmt(tax);
+  document.getElementById("stotal").textContent = fmt(tot);
+
+  // Pastikan cart-sum dan total-box selalu tampil
+  sumEl.style.display = "";
+  sumEl.style.visibility = "visible";
+  document.querySelector(".total-box").style.display = "flex";
+}
+
+async function applyVoucher() {
+  const code = document.getElementById("vcode").value.trim();
+  if (!code) return;
+  const sub = Object.values(cart).reduce((s,i)=>s+i.price*i.qty,0);
+  try {
+    const res = await fetch("/api/voucher/cek",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,subtotal:sub})});
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    vData = d.voucher; vDisc = d.discount;
+    document.getElementById("vok").style.display = "flex";
+    document.getElementById("vlabel").textContent = code + " — -" + fmt(vDisc);
+    renderCart(); showToast("Voucher berhasil!","success");
+  } catch(e) { showToast(e.message,"error"); }
+}
+
+function clearVoucher() {
+  vData=null; vDisc=0;
+  document.getElementById("vcode").value="";
+  document.getElementById("vok").style.display="none";
+  renderCart();
+}
+
+function openCheckout() {
+  if (!Object.keys(cart).length) return;
+  const items = Object.values(cart);
+  document.getElementById("oitems").innerHTML = items.map(i =>
+    '<div class="oitem"><span>' + emo(i.category||"") + " " + i.name + " x" + i.qty + '</span><span>' + fmt(i.price*i.qty) + '</span></div>'
+  ).join("");
+  document.getElementById("ototal").textContent = fmt(getTotal());
+  document.getElementById("copaid").value = "";
+  document.getElementById("kbox").style.display = "none";
+  document.getElementById("mform").style.display = "";
+  document.getElementById("msuccess").style.display = "none";
+  document.getElementById("mtitle").textContent = "Konfirmasi Pembayaran";
+  document.getElementById("overlay").classList.add("open");
+}
+function closeCheckout() { document.getElementById("overlay").classList.remove("open"); }
+
+function setPayMethod(el) {
+  document.querySelectorAll(".ppill").forEach(p=>p.classList.remove("active"));
+  el.classList.add("active"); payMethod = el.dataset.val;
+  document.getElementById("cash-sec").style.display = payMethod==="cash" ? "" : "none";
+}
+function setCash(v) { document.getElementById("copaid").value=v; updateKembalian(); }
+function setExact() { setCash(Math.ceil(getTotal()/1000)*1000); }
+function updateKembalian() {
+  const paid = parseFloat(document.getElementById("copaid").value)||0;
+  const tot  = getTotal();
+  const box  = document.getElementById("kbox");
+  const val  = document.getElementById("kval");
+  if (!paid) { box.style.display="none"; return; }
+  const change = paid-tot;
+  box.style.display = "flex";
+  box.className = "kbox" + (change<0?" kurang":"");
+  val.className = "kval" + (change<0?" kurang":"");
+  val.textContent = change<0 ? ("-"+fmt(Math.abs(change))+" (kurang)") : fmt(change);
+}
+
+async function confirmOrder() {
+  const btn  = document.getElementById("btn-confirm");
+  const name = document.getElementById("coname").value.trim() || "Pelanggan";
+  if (payMethod==="cash") {
+    const paid = parseFloat(document.getElementById("copaid").value)||0;
+    if (paid < getTotal()) { showToast("Uang kurang","warning"); return; }
+  }
+  btn.disabled=true; btn.textContent="Memproses...";
+  const items = Object.values(cart).map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty,discount:0}));
+  const paid  = payMethod==="cash" ? (parseFloat(document.getElementById("copaid").value)||0) : getTotal();
+  try {
+    const res = await fetch("/api/transaksi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items,payment_method:payMethod,amount_paid:paid,discount_pct:0,discount_nominal:0,voucher_code:vData?.code||"",voucher_discount:vDisc,points_used:0,note:"Pesanan mandiri - "+name})});
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    const tot=getTotal(), change=paid-tot;
+    document.getElementById("ibox").innerHTML =
+      '<div class="irow"><span>Invoice</span><strong>'+d.invoice+'</strong></div>' +
+      '<div class="irow"><span>Total</span><strong style="color:var(--accent2);">'+fmt(tot)+'</strong></div>' +
+      (payMethod==="cash"?'<div class="irow"><span>Kembalian</span><strong style="color:var(--success);">'+fmt(change)+'</strong></div>':"") +
+      '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);">'+STORE_FOOTER+'</div>';
+    document.getElementById("mform").style.display    = "none";
+    document.getElementById("msuccess").style.display = "";
+    document.getElementById("mtitle").textContent = "Berhasil!";
+  } catch(e) { showToast(e.message,"error"); }
+  finally { btn.disabled=false; btn.textContent="Konfirmasi"; }
+}
+
+function resetAll() { cart={}; vData=null; vDisc=0; clearVoucher(); renderCart(); closeCheckout(); }
+
+function showToast(msg, type="info") {
+  const t=document.getElementById("toast");
+  const c={success:"var(--success)",error:"var(--danger)",warning:"#f9c74f",info:"var(--accent2)"};
+  t.textContent=msg; t.style.borderColor=c[type]||c.info; t.style.color=c[type]||c.info;
+  t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600);
+}
+
+window.addEventListener("message", e => {
+  if (e.data?.type==="ADD_ITEM") addItem(e.data.product);
+  if (e.data?.type==="CLEAR_CART") resetAll();
+});
+
+// ── SUPABASE REALTIME SUBSCRIBE ───────────────────────
+function initRealtimeSubscribe() {
+  const wsUrl = SB_URL.replace("https://","wss://").replace("http://","ws://")
+    + "/realtime/v1/websocket?apikey=" + SB_KEY + "&vsn=1.0.0";
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      topic: "realtime:pos-cart",
+      event: "phx_join",
+      payload: { config: { broadcast: { self: false } } },
+      ref: "1"
+    }));
+    setIndicator(true);
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.event === "broadcast" && msg.payload?.event === "cart_update") {
+        syncCartFromKasir(msg.payload.payload?.items || []);
+      }
+    } catch(_) {}
+  };
+
+  ws.onclose = () => { setIndicator(false); setTimeout(initRealtimeSubscribe, 3000); };
+  ws.onerror = () => ws.close();
+
+  setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({topic:"phoenix",event:"heartbeat",payload:{},ref:"hb"}));
+  }, 30000);
+}
+
+function syncCartFromKasir(items) {
+  cart = {};
+  items.forEach(i => { if (i.qty > 0) cart[i.id] = {...i}; });
+  // Reset voucher karena kasir yang pegang diskon
+  vDisc = 0; vData = null;
+  document.getElementById("vcode").value = "";
+  document.getElementById("vok").style.display = "none";
+  renderCart();
+  if (items.length > 0) {
+    flashCart();
+    showToast("Keranjang diperbarui oleh kasir", "info");
+  }
+}
+
+function flashCart() {
+  const p = document.querySelector(".panel-cart");
+  if (!p) return;
+  p.style.transition = "background .25s";
+  p.style.background = "rgba(31,105,164,0.18)";
+  setTimeout(() => { p.style.background = ""; }, 700);
+}
+
+function setIndicator(ok) {
+  const el = document.getElementById("rt-dot");
+  if (!el) return;
+  el.style.background = ok ? "var(--success)" : "#f9c74f";
+  el.title = ok ? "Terhubung ke kasir" : "Menghubungkan...";
+}
+
+initRealtimeSubscribe();
+</script>
+</body>
+</html>
